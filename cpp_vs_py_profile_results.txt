@@ -1,0 +1,3 @@
+Python: 272ms
+C++: 63ms
+Speedup: 4.3x
