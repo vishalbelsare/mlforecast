@@ -6,7 +6,7 @@
 
 #include "rolling.h"
 
-void rolling_mean(float* data, int32_t n_data, int32_t window_size, int32_t min_samples, float* out) {
+void my_rolling_mean(float* data, int32_t n_data, int32_t window_size, int32_t min_samples, float* out) {
     float accum = 0.0;
     for (int i = 0; i < min_samples - 1; ++i) {
         accum += data[i];
