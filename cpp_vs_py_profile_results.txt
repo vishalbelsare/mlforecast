@@ -1,4 +1,7 @@
-Python: 1883ms
-C++: 437ms
-Speedup: 4.3x
-Boost: 500ms
+Python: 485ms
+C++: 98ms
+Speedup: 4.9x
+Python updates: 196ms
+C++ updates: 1ms
+Updates speedup: 212.7x
+Boost: 245ms
