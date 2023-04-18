@@ -10,8 +10,8 @@ from mlforecast.core import GroupedArray, TimeSeries
 # Setup
 _LIB = ctypes.cdll.LoadLibrary('cmake-build-release/libmlforecast.so')
 n_series = 50_000
-min_length = 500
-max_length = 1_000
+min_length = 1_000
+max_length = 2_000
 seed = 0
 
 rng = np.random.RandomState(0)
@@ -26,6 +26,7 @@ ga = GroupedArray(data, indptr)
 lag = 2
 window_size = 5
 min_samples = 1
+num_threads = 1
 ts = TimeSeries(
     freq=1,
     lag_transforms={
@@ -33,7 +34,7 @@ ts = TimeSeries(
               (rolling_mean, window_size + 1, min_samples),
               (rolling_mean, window_size + 2, min_samples),
               (rolling_mean, window_size + 3, min_samples),]},
-    num_threads=4,
+    num_threads=num_threads,
 )
 ts.ga = ga
 # to trigger compilation
@@ -54,6 +55,7 @@ _LIB.GroupedArray_CreateFromArrays(
     ctypes.c_int32(data.size),
     indptr.ctypes.data_as(ctypes.POINTER(ctypes.c_int32)),
     ctypes.c_int32(indptr.size),
+    ctypes.c_int(num_threads),
     ctypes.byref(handle),
 )
 group_sizes = np.empty(indptr.size - 1, dtype=np.int32)
