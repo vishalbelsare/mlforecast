@@ -1,0 +1,2465 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.3.433">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="description" content="Distributed pipeline encapsulation">
+
+<title>mlforecast - DistributedMLForecast</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { display: inline-block; line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="site_libs/quarto-nav/headroom.min.js"></script>
+<script src="site_libs/clipboard/clipboard.min.js"></script>
+<script src="site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="site_libs/quarto-search/fuse.min.js"></script>
+<script src="site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="./">
+<script src="site_libs/quarto-html/quarto.js"></script>
+<script src="site_libs/quarto-html/popper.min.js"></script>
+<script src="site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="site_libs/quarto-html/anchor.min.js"></script>
+<link href="site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="site_libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="site_libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "navbar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "end",
+  "type": "overlay",
+  "limit": 20,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+<script async="" src="https://www.googletagmanager.com/gtag/js?id=G-NXJNCVR18L"></script>
+
+<script type="text/javascript">
+
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', 'G-NXJNCVR18L', { 'anonymize_ip': true});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" integrity="sha512-c3Nl8+7g4LMSTdrm621y7kf9v3SDPnhxLNhcjFJbKECVnmZHTdo+IRO05sNLTH/D3vA6u1X32ehoLC7WFVdheg==" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js" integrity="sha512-bLT0Qm9VnAYZDflyKcBaQ2gg0hSYNQrJ8RilYldYQ1FxQYoCLtUjuuRuZo+fjqhx/qtq/1itJ0C2ejDxltZVFg==" crossorigin="anonymous"></script>
+<script type="application/javascript">define('jquery', [],function() {return window.jQuery;})</script>
+
+
+<link rel="stylesheet" href="styles.css">
+<meta property="og:title" content="mlforecast - DistributedMLForecast">
+<meta property="og:description" content="Distributed pipeline encapsulation">
+<meta property="og:image" content="https://github.com/Nixtla/styles/blob/2abf51612584169874c90cd7c4d347e3917eaf73/images/Banner%20Github.png">
+<meta property="og:site-name" content="mlforecast">
+<meta name="twitter:title" content="mlforecast - DistributedMLForecast">
+<meta name="twitter:description" content="Distributed pipeline encapsulation">
+<meta name="twitter:image" content="https://farm6.staticflickr.com/5510/14338202952_93595258ff_z.jpg">
+<meta name="twitter:site" content="@Nixtlainc">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+
+<body class="nav-sidebar floating nav-fixed">
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+    <nav class="navbar navbar-expand-lg navbar-dark ">
+      <div class="navbar-container container-fluid">
+      <div class="navbar-brand-container">
+    <a class="navbar-brand" href="./index.html">
+    <span class="navbar-title">mlforecast</span>
+    </a>
+  </div>
+            <div id="quarto-search" class="" title="Search"></div>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+  <span class="navbar-toggler-icon"></span>
+</button>
+          <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav navbar-nav-scroll me-auto">
+  <li class="nav-item">
+    <a class="nav-link active" href="./docs/quick_start_local.html" rel="" target="" aria-current="page">
+ <span class="menu-text">Get Started</span></a>
+  </li>  
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-nixtlaverse" role="button" data-bs-toggle="dropdown" aria-expanded="false" rel="" target="">
+ <span class="menu-text">NixtlaVerse</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-nixtlaverse">    
+        <li>
+    <a class="dropdown-item" href="https://github.com/nixtla/statsforecast" rel="" target="">
+ <span class="dropdown-text">StatsForecast ⚡️</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="https://github.com/nixtla/neuralforecast" rel="" target="">
+ <span class="dropdown-text">NeuralForecast 🧠</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="https://github.com/nixtla/hierarchicalforecast" rel="" target="">
+ <span class="dropdown-text">HierarchicalForecast 👑</span></a>
+  </li>  
+    </ul>
+  </li>
+  <li class="nav-item dropdown ">
+    <a class="nav-link dropdown-toggle" href="#" id="nav-menu-help" role="button" data-bs-toggle="dropdown" aria-expanded="false" rel="" target="">
+ <span class="menu-text">Help</span>
+    </a>
+    <ul class="dropdown-menu" aria-labelledby="nav-menu-help">    
+        <li>
+    <a class="dropdown-item" href="https://github.com/nixtla/mlforecast/issues/new/choose" rel="" target=""><i class="bi bi-bug" role="img">
+</i> 
+ <span class="dropdown-text">Report an Issue</span></a>
+  </li>  
+        <li>
+    <a class="dropdown-item" href="https://join.slack.com/t/nixtlaworkspace/shared_invite/zt-135dssye9-fWTzMpv2WBthq8NK0Yvu6A" rel="" target=""><i class="bi bi-chat-right-text" role="img">
+</i> 
+ <span class="dropdown-text">Join our Slack</span></a>
+  </li>  
+    </ul>
+  </li>
+</ul>
+            <ul class="navbar-nav navbar-nav-scroll ms-auto">
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://github.com/nixtla/mlforecast" rel="" target=""><i class="bi bi-github" role="img">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+  <li class="nav-item compact">
+    <a class="nav-link" href="https://twitter.com/nixtlainc" rel="" target=""><i class="bi bi-twitter" role="img" aria-label="Nixtla Twitter">
+</i> 
+ <span class="menu-text"></span></a>
+  </li>  
+</ul>
+            <div class="quarto-navbar-tools">
+</div>
+          </div> <!-- /navcollapse -->
+      </div> <!-- /container-fluid -->
+    </nav>
+  <nav class="quarto-secondary-nav">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+      <nav class="quarto-page-breadcrumbs" aria-label="breadcrumb"><ol class="breadcrumb"><li class="breadcrumb-item">API reference</li><li class="breadcrumb-item"><a href="./distributed.forecast.html">Distributed</a></li><li class="breadcrumb-item"><a href="./distributed.forecast.html">DistributedMLForecast</a></li></ol></nav>
+      <a class="flex-grow-1" role="button" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+      </a>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal sidebar-navigation floating overflow-auto">
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Nixtla &nbsp; <a href="https://twitter.com/intent/tweet?text=Statistical%20Forecasting%20Algorithms%20by%20Nixtla%20&amp;url=https://github.com/Nixtla/statsforecast&amp;via=nixtlainc&amp;hashtags=StatisticalModels,TimeSeries,Forecasting"><img src="https://img.shields.io/twitter/url/http/shields.io.svg?style=social" class="img-fluid" alt="Tweet"></a> &nbsp;<a href="https://join.slack.com/t/nixtlacommunity/shared_invite/zt-1pmhan9j5-F54XR20edHk0UtYAPcW4KQ"><img src="https://img.shields.io/badge/Slack-4A154B?&amp;logo=slack&amp;logoColor=white.png" class="img-fluid" alt="Slack"></a></span></a>
+  </div>
+</li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true">
+ <span class="menu-text">Getting started</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-1" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-1" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/install.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Install</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/quick_start_local.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Quick start (local)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/quick_start_distributed.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Quick start (distributed)</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/end_to_end_walkthrough.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">End to end walkthrough</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true">
+ <span class="menu-text">Tutorials</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-2" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-2" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/cross_validation.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Cross validation</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/electricity_peak_forecasting.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Detect Demand Peaks</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/prediction_intervals.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Probabilistic forecasting</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./docs/transfer_learning.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Transfer Learning</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+        <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" aria-expanded="true">
+ <span class="menu-text">API reference</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-3" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-3" class="collapse list-unstyled sidebar-section depth1 show">  
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" aria-expanded="true">
+ <span class="menu-text">Local</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-4" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-4" class="collapse list-unstyled sidebar-section depth2 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./forecast.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">MLForecast</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./lgb_cv.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">LightGBMCV</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./utils.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Utils</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./core.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Core</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+          <li class="sidebar-item sidebar-item-section">
+      <div class="sidebar-item-container"> 
+            <a class="sidebar-item-text sidebar-link text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" aria-expanded="true">
+ <span class="menu-text">Distributed</span></a>
+          <a class="sidebar-item-toggle text-start" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar-section-5" aria-expanded="true" aria-label="Toggle section">
+            <i class="bi bi-chevron-right ms-2"></i>
+          </a> 
+      </div>
+      <ul id="quarto-sidebar-section-5" class="collapse list-unstyled sidebar-section depth2 show">  
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./distributed.forecast.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text">DistributedMLForecast</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./distributed.models.dask.lgb.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">DaskLGBMForecast</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./distributed.models.dask.xgb.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">DaskXGBForecast</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./distributed.models.spark.lgb.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">SparkLGBMForecast</span></a>
+  </div>
+</li>
+          <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="./distributed.models.spark.xgb.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">SparkXGBForecast</span></a>
+  </div>
+</li>
+      </ul>
+  </li>
+      </ul>
+  </li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" data-bs-toggle="collapse" data-bs-target="#quarto-sidebar,#quarto-sidebar-glass"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" class="toc-active">
+    <h2 id="toc-title">On this page</h2>
+   
+  <ul>
+  <li><a href="#distributedmlforecast" id="toc-distributedmlforecast" class="nav-link active" data-scroll-target="#distributedmlforecast">DistributedMLForecast</a></li>
+  <li><a href="#dask" id="toc-dask" class="nav-link" data-scroll-target="#dask">Dask</a>
+  <ul class="collapse">
+  <li><a href="#client-setup" id="toc-client-setup" class="nav-link" data-scroll-target="#client-setup">Client setup</a></li>
+  <li><a href="#data-setup" id="toc-data-setup" class="nav-link" data-scroll-target="#data-setup">Data setup</a></li>
+  <li><a href="#models" id="toc-models" class="nav-link" data-scroll-target="#models">Models</a></li>
+  <li><a href="#training" id="toc-training" class="nav-link" data-scroll-target="#training">Training</a></li>
+  <li><a href="#using-all-the-data" id="toc-using-all-the-data" class="nav-link" data-scroll-target="#using-all-the-data">1. Using all the data</a></li>
+  </ul></li>
+  <li><a href="#distributedmlforecast.fit" id="toc-distributedmlforecast.fit" class="nav-link" data-scroll-target="#distributedmlforecast.fit">DistributedMLForecast.fit</a>
+  <ul class="collapse">
+  <li><a href="#forecasting" id="toc-forecasting" class="nav-link" data-scroll-target="#forecasting">Forecasting</a></li>
+  </ul></li>
+  <li><a href="#distributedmlforecast.predict" id="toc-distributedmlforecast.predict" class="nav-link" data-scroll-target="#distributedmlforecast.predict">DistributedMLForecast.predict</a>
+  <ul class="collapse">
+  <li><a href="#preprocess-and-train" id="toc-preprocess-and-train" class="nav-link" data-scroll-target="#preprocess-and-train">2. Preprocess and train</a></li>
+  </ul></li>
+  <li><a href="#distributedmlforecast.preprocess" id="toc-distributedmlforecast.preprocess" class="nav-link" data-scroll-target="#distributedmlforecast.preprocess">DistributedMLForecast.preprocess</a>
+  <ul class="collapse">
+  <li><a href="#dynamic-features" id="toc-dynamic-features" class="nav-link" data-scroll-target="#dynamic-features">Dynamic features</a></li>
+  <li><a href="#custom-predictions" id="toc-custom-predictions" class="nav-link" data-scroll-target="#custom-predictions">Custom predictions</a></li>
+  </ul></li>
+  <li><a href="#distributedmlforecast.cross_validation" id="toc-distributedmlforecast.cross_validation" class="nav-link" data-scroll-target="#distributedmlforecast.cross_validation">DistributedMLForecast.cross_validation</a></li>
+  <li><a href="#spark" id="toc-spark" class="nav-link" data-scroll-target="#spark">Spark</a>
+  <ul class="collapse">
+  <li><a href="#session-setup" id="toc-session-setup" class="nav-link" data-scroll-target="#session-setup">Session setup</a></li>
+  <li><a href="#data-setup-1" id="toc-data-setup-1" class="nav-link" data-scroll-target="#data-setup-1">Data setup</a></li>
+  <li><a href="#models-1" id="toc-models-1" class="nav-link" data-scroll-target="#models-1">Models</a></li>
+  <li><a href="#training-1" id="toc-training-1" class="nav-link" data-scroll-target="#training-1">Training</a></li>
+  <li><a href="#forecasting-1" id="toc-forecasting-1" class="nav-link" data-scroll-target="#forecasting-1">Forecasting</a></li>
+  <li><a href="#cross-validation-1" id="toc-cross-validation-1" class="nav-link" data-scroll-target="#cross-validation-1">Cross validation</a></li>
+  </ul></li>
+  <li><a href="#ray" id="toc-ray" class="nav-link" data-scroll-target="#ray">Ray</a>
+  <ul class="collapse">
+  <li><a href="#session-setup-1" id="toc-session-setup-1" class="nav-link" data-scroll-target="#session-setup-1">Session setup</a></li>
+  <li><a href="#data-setup-2" id="toc-data-setup-2" class="nav-link" data-scroll-target="#data-setup-2">Data setup</a></li>
+  <li><a href="#models-2" id="toc-models-2" class="nav-link" data-scroll-target="#models-2">Models</a></li>
+  <li><a href="#training-2" id="toc-training-2" class="nav-link" data-scroll-target="#training-2">Training</a></li>
+  <li><a href="#forecasting-2" id="toc-forecasting-2" class="nav-link" data-scroll-target="#forecasting-2">Forecasting</a></li>
+  <li><a href="#cross-validation-2" id="toc-cross-validation-2" class="nav-link" data-scroll-target="#cross-validation-2">Cross validation</a></li>
+  </ul></li>
+  </ul>
+<div class="toc-actions"><div><i class="bi bi-github"></i></div><div class="action-links"><p><a href="https://github.com/Nixtla/mlforecast/issues/new" class="toc-action">Report an issue</a></p></div></div></nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">DistributedMLForecast</h1>
+</div>
+
+<div>
+  <div class="description">
+    Distributed pipeline encapsulation
+  </div>
+</div>
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+</header>
+
+<!-- WARNING: THIS FILE WAS AUTOGENERATED! DO NOT EDIT! -->
+<hr>
+<section id="distributedmlforecast" class="level3">
+<h3 class="anchored" data-anchor-id="distributedmlforecast">DistributedMLForecast</h3>
+<blockquote class="blockquote">
+<pre><code> DistributedMLForecast (models,
+                        freq:Union[int,str,pandas._libs.tslibs.offsets.Bas
+                        eOffset,NoneType]=None,
+                        lags:Optional[Iterable[int]]=None, lag_transforms:
+                        Optional[Dict[int,List[Union[Callable,Tuple[Callab
+                        le,Any]]]]]=None, date_features:Optional[Iterable[
+                        Union[str,Callable]]]=None,
+                        differences:Optional[Iterable[int]]=None,
+                        num_threads:int=1, target_transforms:Optional[List
+                        [mlforecast.target_transforms.BaseTargetTransform]
+                        ]=None, engine=None,
+                        num_partitions:Optional[int]=None)</code></pre>
+</blockquote>
+<p>Multi backend distributed pipeline</p>
+<p>The <code>DistributedMLForecast</code> class is a high level abstraction that encapsulates all the steps in the pipeline (preprocessing, fitting the model and computing predictions) and applies them in a distributed way.</p>
+<p>The different things that you need to use <code>DistributedMLForecast</code> (as opposed to <code>MLForecast</code>) are:</p>
+<ol type="1">
+<li>You need to set up a cluster. We currently support dask and spark (ray is on the roadmap).</li>
+<li>Your data needs to be a distributed collection. We currently support dask and spark dataframes.</li>
+<li>You need to use a model that implements distributed training in your framework of choice, e.g.&nbsp;SynapseML for LightGBM in spark.</li>
+</ol>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> matplotlib.pyplot <span class="im">as</span> plt</span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> numpy <span class="im">as</span> np</span>
+<span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> pandas <span class="im">as</span> pd</span>
+<span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> dask.distributed <span class="im">import</span> Client</span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> window_ops.expanding <span class="im">import</span> expanding_mean</span>
+<span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> window_ops.rolling <span class="im">import</span> rolling_mean</span>
+<span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlforecast.target_transforms <span class="im">import</span> Differences</span>
+<span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlforecast.utils <span class="im">import</span> backtest_splits, generate_daily_series, generate_prices_for_series</span>
+<span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlforecast.distributed.models.dask.lgb <span class="im">import</span> DaskLGBMForecast</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlforecast.distributed.models.dask.xgb <span class="im">import</span> DaskXGBForecast</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="dask" class="level2">
+<h2 class="anchored" data-anchor-id="dask">Dask</h2>
+<section id="client-setup" class="level3">
+<h3 class="anchored" data-anchor-id="client-setup">Client setup</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>client <span class="op">=</span> Client(n_workers<span class="op">=</span><span class="dv">2</span>, threads_per_worker<span class="op">=</span><span class="dv">1</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Here we define a client that connects to a <code>dask.distributed.LocalCluster</code>, however it could be any other kind of cluster.</p>
+</section>
+<section id="data-setup" class="level3">
+<h3 class="anchored" data-anchor-id="data-setup">Data setup</h3>
+<p>For dask, the data must be a <code>dask.dataframe.DataFrame</code>. You need to make sure that each time serie is only in one partition and it is recommended that you have as many partitions as you have workers. If you have more partitions than workers make sure to set <code>num_threads=1</code> to avoid having nested parallelism.</p>
+<p>The required input format is the same as for <code>MLForecast</code>, except that it’s a <code>dask.dataframe.DataFrame</code> instead of a <code>pandas.Dataframe</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a>series <span class="op">=</span> generate_daily_series(<span class="dv">100</span>, n_static_features<span class="op">=</span><span class="dv">2</span>, equal_ends<span class="op">=</span><span class="va">True</span>, static_as_categorical<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>npartitions <span class="op">=</span> <span class="dv">10</span></span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>partitioned_series <span class="op">=</span> dd.from_pandas(series.set_index(<span class="st">'unique_id'</span>), npartitions<span class="op">=</span>npartitions)  <span class="co"># make sure we split by the id_col</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>partitioned_series <span class="op">=</span> partitioned_series.map_partitions(<span class="kw">lambda</span> df: df.reset_index())</span>
+<span id="cb4-5"><a href="#cb4-5" aria-hidden="true" tabindex="-1"></a>partitioned_series[<span class="st">'unique_id'</span>] <span class="op">=</span> partitioned_series[<span class="st">'unique_id'</span>].astype(<span class="bu">str</span>)  <span class="co"># can't handle categoricals atm</span></span>
+<span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>partitioned_series</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div><strong>Dask DataFrame Structure:</strong></div>
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">y</th>
+<th data-quarto-table-cell-role="th">static_0</th>
+<th data-quarto-table-cell-role="th">static_1</th>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">npartitions=10</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">id_00</td>
+<td>object</td>
+<td>datetime64[ns]</td>
+<td>float64</td>
+<td>int64</td>
+<td>int64</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">id_10</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">id_89</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">id_99</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div>Dask Name: assign, 5 graph layers</div>
+</div>
+</div>
+</section>
+<section id="models" class="level3">
+<h3 class="anchored" data-anchor-id="models">Models</h3>
+<p>In order to perform distributed forecasting, we need to use a model that is able to train in a distributed way using <code>dask</code>. The current implementations are in <code>DaskLGBMForecast</code> and <code>DaskXGBForecast</code> which are just wrappers around the native implementations.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>models <span class="op">=</span> [DaskXGBForecast(random_state<span class="op">=</span><span class="dv">0</span>), DaskLGBMForecast(random_state<span class="op">=</span><span class="dv">0</span>)]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="training" class="level3">
+<h3 class="anchored" data-anchor-id="training">Training</h3>
+<p>Once we have our models we instantiate a <code>DistributedMLForecast</code> object defining our features.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a>fcst <span class="op">=</span> DistributedMLForecast(</span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>models,</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">'D'</span>,</span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span>[<span class="dv">7</span>],</span>
+<span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a>    lag_transforms<span class="op">=</span>{</span>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a>        <span class="dv">1</span>: [expanding_mean],</span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>        <span class="dv">7</span>: [(rolling_mean, <span class="dv">14</span>)]</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a>    date_features<span class="op">=</span>[<span class="st">'dayofweek'</span>, <span class="st">'month'</span>],</span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>    num_threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>    engine<span class="op">=</span>client,</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>fcst</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>DistributedMLForecast(models=[DaskXGBForecast, DaskLGBMForecast], freq=&lt;Day&gt;, lag_features=['lag7', 'expanding_mean_lag1', 'rolling_mean_lag7_window_size14'], date_features=['dayofweek', 'month'], num_threads=1, engine=&lt;Client: 'tcp://127.0.0.1:42319' processes=2 threads=2, memory=15.48 GiB&gt;)</code></pre>
+</div>
+</div>
+<p>Here where we say that:</p>
+<ul>
+<li>Our series have daily frequency.</li>
+<li>We want to use lag 7 as a feature</li>
+<li>We want the lag transformations to be:
+<ul>
+<li>expanding mean of the lag 1</li>
+<li>rolling mean of the lag 7 over a window of size 14</li>
+</ul></li>
+<li>We want to use dayofweek and month as date features.</li>
+<li>We want to perform the preprocessing and the forecasting steps using 1 thread, because we have 10 partitions and 2 workers.</li>
+</ul>
+<p>From this point we have two options:</p>
+<ol type="1">
+<li>Compute the features and fit our models.</li>
+<li>Compute the features and get them back as a dataframe to do some custom splitting or adding additional features, then training the models.</li>
+</ol>
+</section>
+<section id="using-all-the-data" class="level3">
+<h3 class="anchored" data-anchor-id="using-all-the-data">1. Using all the data</h3>
+<hr>
+</section>
+</section>
+<section id="distributedmlforecast.fit" class="level2">
+<h2 class="anchored" data-anchor-id="distributedmlforecast.fit">DistributedMLForecast.fit</h2>
+<blockquote class="blockquote">
+<pre><code> DistributedMLForecast.fit (df:~AnyDataFrame, id_col:str='unique_id',
+                            time_col:str='ds', target_col:str='y',
+                            static_features:Optional[List[str]]=None,
+                            dropna:bool=True,
+                            keep_last_n:Optional[int]=None,
+                            data:Optional[~AnyDataFrame]=None)</code></pre>
+</blockquote>
+<p>Apply the feature engineering and train the models.</p>
+<table class="table">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 25%">
+<col style="width: 34%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Details</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>df</td>
+<td>AnyDataFrame</td>
+<td></td>
+<td>Series data in long format.</td>
+</tr>
+<tr class="even">
+<td>id_col</td>
+<td>str</td>
+<td>unique_id</td>
+<td>Column that identifies each serie.</td>
+</tr>
+<tr class="odd">
+<td>time_col</td>
+<td>str</td>
+<td>ds</td>
+<td>Column that identifies each timestep, its values can be timestamps or integers.</td>
+</tr>
+<tr class="even">
+<td>target_col</td>
+<td>str</td>
+<td>y</td>
+<td>Column that contains the target.</td>
+</tr>
+<tr class="odd">
+<td>static_features</td>
+<td>typing.Optional[typing.List[str]]</td>
+<td>None</td>
+<td>Names of the features that are static and will be repeated when forecasting.</td>
+</tr>
+<tr class="even">
+<td>dropna</td>
+<td>bool</td>
+<td>True</td>
+<td>Drop rows with missing values produced by the transformations.</td>
+</tr>
+<tr class="odd">
+<td>keep_last_n</td>
+<td>typing.Optional[int]</td>
+<td>None</td>
+<td>Keep only these many records from each serie for the forecasting step. Can save time and memory if your features allow it.</td>
+</tr>
+<tr class="even">
+<td>data</td>
+<td>typing.Optional[~AnyDataFrame]</td>
+<td>None</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><strong>Returns</strong></td>
+<td><strong>DistributedMLForecast</strong></td>
+<td></td>
+<td><strong>noqa: ARG002</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Calling <code>fit</code> on our data computes the features independently for each partition and performs distributed training.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>fcst.fit(partitioned_series)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="forecasting" class="level3">
+<h3 class="anchored" data-anchor-id="forecasting">Forecasting</h3>
+<hr>
+</section>
+</section>
+<section id="distributedmlforecast.predict" class="level2">
+<h2 class="anchored" data-anchor-id="distributedmlforecast.predict">DistributedMLForecast.predict</h2>
+<blockquote class="blockquote">
+<pre><code> DistributedMLForecast.predict (h:int,
+                                dynamic_dfs:Optional[List[pandas.core.fram
+                                e.DataFrame]]=None, before_predict_callbac
+                                k:Optional[Callable]=None, after_predict_c
+                                allback:Optional[Callable]=None,
+                                new_df:Optional[~AnyDataFrame]=None,
+                                horizon:Optional[int]=None,
+                                new_data:Optional[~AnyDataFrame]=None)</code></pre>
+</blockquote>
+<p>Compute the predictions for the next <code>horizon</code> steps.</p>
+<table class="table">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 25%">
+<col style="width: 34%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Details</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>h</td>
+<td>int</td>
+<td></td>
+<td>Forecast horizon.</td>
+</tr>
+<tr class="even">
+<td>dynamic_dfs</td>
+<td>typing.Optional[typing.List[pandas.core.frame.DataFrame]]</td>
+<td>None</td>
+<td>Future values of the dynamic features, e.g.&nbsp;prices.</td>
+</tr>
+<tr class="odd">
+<td>before_predict_callback</td>
+<td>typing.Optional[typing.Callable]</td>
+<td>None</td>
+<td>Function to call on the features before computing the predictions.<br> This function will take the input dataframe that will be passed to the model for predicting and should return a dataframe with the same structure.<br> The series identifier is on the index.</td>
+</tr>
+<tr class="even">
+<td>after_predict_callback</td>
+<td>typing.Optional[typing.Callable]</td>
+<td>None</td>
+<td>Function to call on the predictions before updating the targets.<br> This function will take a pandas Series with the predictions and should return another one with the same structure.<br> The series identifier is on the index.</td>
+</tr>
+<tr class="odd">
+<td>new_df</td>
+<td>typing.Optional[~AnyDataFrame]</td>
+<td>None</td>
+<td>Series data of new observations for which forecasts are to be generated.<br> This dataframe should have the same structure as the one used to fit the model, including any features and time series data.<br> If <code>new_df</code> is not None, the method will generate forecasts for the new observations.</td>
+</tr>
+<tr class="even">
+<td>horizon</td>
+<td>typing.Optional[int]</td>
+<td>None</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td>new_data</td>
+<td>typing.Optional[~AnyDataFrame]</td>
+<td>None</td>
+<td></td>
+</tr>
+<tr class="even">
+<td><strong>Returns</strong></td>
+<td><strong>AnyDataFrame</strong></td>
+<td></td>
+<td><strong>Predictions for each serie and timestep, with one column per model.</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Once we have our fitted models we can compute the predictions for the next 7 timesteps.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a>preds <span class="op">=</span> fcst.predict(<span class="dv">7</span>)</span>
+<span id="cb11-2"><a href="#cb11-2" aria-hidden="true" tabindex="-1"></a>preds</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div><strong>Dask DataFrame Structure:</strong></div>
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">DaskXGBForecast</th>
+<th data-quarto-table-cell-role="th">DaskLGBMForecast</th>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">npartitions=10</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">id_00</td>
+<td>object</td>
+<td>datetime64[ns]</td>
+<td>float64</td>
+<td>float64</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">id_10</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">id_89</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">id_99</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+<div>Dask Name: map, 17 graph layers</div>
+</div>
+</div>
+<section id="preprocess-and-train" class="level3">
+<h3 class="anchored" data-anchor-id="preprocess-and-train">2. Preprocess and train</h3>
+<p>If we only want to perform the preprocessing step we call <code>preprocess</code> with our data.</p>
+<hr>
+</section>
+</section>
+<section id="distributedmlforecast.preprocess" class="level2">
+<h2 class="anchored" data-anchor-id="distributedmlforecast.preprocess">DistributedMLForecast.preprocess</h2>
+<blockquote class="blockquote">
+<pre><code> DistributedMLForecast.preprocess (df:~AnyDataFrame,
+                                   id_col:str='unique_id',
+                                   time_col:str='ds', target_col:str='y', 
+                                   static_features:Optional[List[str]]=Non
+                                   e, dropna:bool=True,
+                                   keep_last_n:Optional[int]=None,
+                                   data:Optional[~AnyDataFrame]=None)</code></pre>
+</blockquote>
+<p>Add the features to <code>data</code>.</p>
+<table class="table">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 25%">
+<col style="width: 34%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Details</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>df</td>
+<td>AnyDataFrame</td>
+<td></td>
+<td>Series data in long format.</td>
+</tr>
+<tr class="even">
+<td>id_col</td>
+<td>str</td>
+<td>unique_id</td>
+<td>Column that identifies each serie.</td>
+</tr>
+<tr class="odd">
+<td>time_col</td>
+<td>str</td>
+<td>ds</td>
+<td>Column that identifies each timestep, its values can be timestamps or integers.</td>
+</tr>
+<tr class="even">
+<td>target_col</td>
+<td>str</td>
+<td>y</td>
+<td>Column that contains the target.</td>
+</tr>
+<tr class="odd">
+<td>static_features</td>
+<td>typing.Optional[typing.List[str]]</td>
+<td>None</td>
+<td>Names of the features that are static and will be repeated when forecasting.</td>
+</tr>
+<tr class="even">
+<td>dropna</td>
+<td>bool</td>
+<td>True</td>
+<td>Drop rows with missing values produced by the transformations.</td>
+</tr>
+<tr class="odd">
+<td>keep_last_n</td>
+<td>typing.Optional[int]</td>
+<td>None</td>
+<td>Keep only these many records from each serie for the forecasting step. Can save time and memory if your features allow it.</td>
+</tr>
+<tr class="even">
+<td>data</td>
+<td>typing.Optional[~AnyDataFrame]</td>
+<td>None</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><strong>Returns</strong></td>
+<td><strong>AnyDataFrame</strong></td>
+<td></td>
+<td><strong>noqa: ARG002</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>features_ddf <span class="op">=</span> fcst.preprocess(partitioned_series)</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>features_ddf.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">y</th>
+<th data-quarto-table-cell-role="th">static_0</th>
+<th data-quarto-table-cell-role="th">static_1</th>
+<th data-quarto-table-cell-role="th">lag7</th>
+<th data-quarto-table-cell-role="th">expanding_mean_lag1</th>
+<th data-quarto-table-cell-role="th">rolling_mean_lag7_window_size14</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">20</td>
+<td>id_00</td>
+<td>2000-10-25</td>
+<td>49.766844</td>
+<td>79</td>
+<td>45</td>
+<td>50.694639</td>
+<td>25.001367</td>
+<td>26.320060</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">21</td>
+<td>id_00</td>
+<td>2000-10-26</td>
+<td>3.918347</td>
+<td>79</td>
+<td>45</td>
+<td>3.887780</td>
+<td>26.180675</td>
+<td>26.313387</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">22</td>
+<td>id_00</td>
+<td>2000-10-27</td>
+<td>9.437778</td>
+<td>79</td>
+<td>45</td>
+<td>11.512774</td>
+<td>25.168751</td>
+<td>26.398056</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">23</td>
+<td>id_00</td>
+<td>2000-10-28</td>
+<td>17.923574</td>
+<td>79</td>
+<td>45</td>
+<td>18.038498</td>
+<td>24.484796</td>
+<td>26.425272</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">24</td>
+<td>id_00</td>
+<td>2000-10-29</td>
+<td>26.754645</td>
+<td>79</td>
+<td>45</td>
+<td>24.222859</td>
+<td>24.211411</td>
+<td>26.305563</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>This is useful if we want to inspect the data the model will be trained. If we do this we must manually train our models and add a local version of them to the <code>models_</code> attribute.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>X, y <span class="op">=</span> features_ddf.drop(columns<span class="op">=</span>[<span class="st">'unique_id'</span>, <span class="st">'ds'</span>, <span class="st">'y'</span>]), features_ddf[<span class="st">'y'</span>]</span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>model <span class="op">=</span> DaskXGBForecast(random_state<span class="op">=</span><span class="dv">0</span>).fit(X, y)</span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>fcst.models_ <span class="op">=</span> {<span class="st">'DaskXGBForecast'</span>: model.model_}</span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>fcst.predict(<span class="dv">7</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<section id="dynamic-features" class="level3">
+<h3 class="anchored" data-anchor-id="dynamic-features">Dynamic features</h3>
+<p>By default the predict method repeats the static features and updates the transformations and the date features. If you have dynamic features like prices or a calendar with holidays you can pass them as a list to the <code>dynamic_dfs</code> argument of <code>DistributedMLForecast.predict</code>, which will call <code>pd.DataFrame.merge</code> on each of them in order.</p>
+<p>Here’s an example:</p>
+<p>Suppose that we have a <code>product_id</code> column and we have a catalog for prices based on that <code>product_id</code> and the date.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a>dynamic_series <span class="op">=</span> series.rename(columns<span class="op">=</span>{<span class="st">'static_1'</span>: <span class="st">'product_id'</span>})</span>
+<span id="cb15-2"><a href="#cb15-2" aria-hidden="true" tabindex="-1"></a>prices_catalog <span class="op">=</span> generate_prices_for_series(dynamic_series)</span>
+<span id="cb15-3"><a href="#cb15-3" aria-hidden="true" tabindex="-1"></a>prices_catalog</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">product_id</th>
+<th data-quarto-table-cell-role="th">price</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>2000-06-09</td>
+<td>1</td>
+<td>0.548814</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>2000-06-10</td>
+<td>1</td>
+<td>0.715189</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>2000-06-11</td>
+<td>1</td>
+<td>0.602763</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>2000-06-12</td>
+<td>1</td>
+<td>0.544883</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>2000-06-13</td>
+<td>1</td>
+<td>0.423655</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">20180</td>
+<td>2001-05-17</td>
+<td>99</td>
+<td>0.223520</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">20181</td>
+<td>2001-05-18</td>
+<td>99</td>
+<td>0.446104</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">20182</td>
+<td>2001-05-19</td>
+<td>99</td>
+<td>0.044783</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">20183</td>
+<td>2001-05-20</td>
+<td>99</td>
+<td>0.483216</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">20184</td>
+<td>2001-05-21</td>
+<td>99</td>
+<td>0.799660</td>
+</tr>
+</tbody>
+</table>
+
+<p>20185 rows × 3 columns</p>
+</div>
+</div>
+</div>
+<p>And you have already merged these prices into your series dataframe.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb16"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>dynamic_series <span class="op">=</span> partitioned_series.rename(columns<span class="op">=</span>{<span class="st">'static_1'</span>: <span class="st">'product_id'</span>})</span>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>dynamic_series <span class="op">=</span> dynamic_series</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a>series_with_prices <span class="op">=</span> dynamic_series.merge(prices_catalog, how<span class="op">=</span><span class="st">'left'</span>)</span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>series_with_prices.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">y</th>
+<th data-quarto-table-cell-role="th">static_0</th>
+<th data-quarto-table-cell-role="th">product_id</th>
+<th data-quarto-table-cell-role="th">price</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>id_00</td>
+<td>2000-10-05</td>
+<td>3.981198</td>
+<td>79</td>
+<td>45</td>
+<td>0.570826</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>id_00</td>
+<td>2000-10-06</td>
+<td>10.327401</td>
+<td>79</td>
+<td>45</td>
+<td>0.260562</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>id_00</td>
+<td>2000-10-07</td>
+<td>17.657474</td>
+<td>79</td>
+<td>45</td>
+<td>0.274048</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>id_00</td>
+<td>2000-10-08</td>
+<td>25.898790</td>
+<td>79</td>
+<td>45</td>
+<td>0.433878</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>id_00</td>
+<td>2000-10-09</td>
+<td>34.494040</td>
+<td>79</td>
+<td>45</td>
+<td>0.653738</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>This dataframe will be passed to <code>DistributedMLForecast.fit</code> (or <code>DistributedMLForecast.preprocess</code>), however since the price is dynamic we have to tell that method that only <code>static_0</code> and <code>product_id</code> are static and we’ll have to update <code>price</code> in every timestep, which basically involves merging the updated features with the prices catalog.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a>fcst <span class="op">=</span> DistributedMLForecast(</span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>    models,</span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">'D'</span>,</span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span>[<span class="dv">7</span>],</span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>    lag_transforms<span class="op">=</span>{</span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>        <span class="dv">1</span>: [expanding_mean],</span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>        <span class="dv">7</span>: [(rolling_mean, <span class="dv">14</span>)]</span>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb17-9"><a href="#cb17-9" aria-hidden="true" tabindex="-1"></a>    date_features<span class="op">=</span>[<span class="st">'dayofweek'</span>, <span class="st">'month'</span>],</span>
+<span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>    num_threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>series_with_prices <span class="op">=</span> series_with_prices</span>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>fcst.fit(</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>    series_with_prices,</span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>    static_features<span class="op">=</span>[<span class="st">'static_0'</span>, <span class="st">'product_id'</span>],</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>So in order to update the price in each timestep we just call <code>DistributedMLForecast.predict</code> with our forecast horizon and pass the prices catalog as a dynamic dataframe.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a>preds <span class="op">=</span> fcst.predict(<span class="dv">7</span>, dynamic_dfs<span class="op">=</span>[prices_catalog])</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>preds.compute()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">DaskXGBForecast</th>
+<th data-quarto-table-cell-role="th">DaskLGBMForecast</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>id_00</td>
+<td>2001-05-15</td>
+<td>42.404003</td>
+<td>43.094384</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>id_00</td>
+<td>2001-05-16</td>
+<td>50.457447</td>
+<td>49.880064</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>id_00</td>
+<td>2001-05-17</td>
+<td>2.044398</td>
+<td>1.938665</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>id_00</td>
+<td>2001-05-18</td>
+<td>10.102403</td>
+<td>10.250496</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>id_00</td>
+<td>2001-05-19</td>
+<td>18.245543</td>
+<td>18.473560</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">72</td>
+<td>id_99</td>
+<td>2001-05-17</td>
+<td>43.536346</td>
+<td>44.494822</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">73</td>
+<td>id_99</td>
+<td>2001-05-18</td>
+<td>2.063584</td>
+<td>2.093080</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">74</td>
+<td>id_99</td>
+<td>2001-05-19</td>
+<td>9.016212</td>
+<td>9.148367</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">75</td>
+<td>id_99</td>
+<td>2001-05-20</td>
+<td>15.630316</td>
+<td>15.048958</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">76</td>
+<td>id_99</td>
+<td>2001-05-21</td>
+<td>22.420233</td>
+<td>23.037681</td>
+</tr>
+</tbody>
+</table>
+
+<p>700 rows × 4 columns</p>
+</div>
+</div>
+</div>
+</section>
+<section id="custom-predictions" class="level3">
+<h3 class="anchored" data-anchor-id="custom-predictions">Custom predictions</h3>
+<p>If you want to do something like scaling the predictions you can define a function and pass it to <code>DistributedMLForecast.predict</code> as described in <a href="./forecast.html#custom-predictions">Custom predictions</a>.</p>
+<section id="cross-validation" class="level4">
+<h4 class="anchored" data-anchor-id="cross-validation">Cross validation</h4>
+<p>Refer to <code>MLForecast.cross_validation</code>.</p>
+<hr>
+</section>
+</section>
+</section>
+<section id="distributedmlforecast.cross_validation" class="level2">
+<h2 class="anchored" data-anchor-id="distributedmlforecast.cross_validation">DistributedMLForecast.cross_validation</h2>
+<blockquote class="blockquote">
+<pre><code> DistributedMLForecast.cross_validation (df:~AnyDataFrame, n_windows:int,
+                                         h:int, id_col:str='unique_id',
+                                         time_col:str='ds',
+                                         target_col:str='y',
+                                         step_size:Optional[int]=None, sta
+                                         tic_features:Optional[List[str]]=
+                                         None, dropna:bool=True,
+                                         keep_last_n:Optional[int]=None,
+                                         refit:bool=True, before_predict_c
+                                         allback:Optional[Callable]=None, 
+                                         after_predict_callback:Optional[C
+                                         allable]=None,
+                                         input_size:Optional[int]=None, da
+                                         ta:Optional[~AnyDataFrame]=None,
+                                         window_size:Optional[int]=None)</code></pre>
+</blockquote>
+<p>Perform time series cross validation. Creates <code>n_windows</code> splits where each window has <code>h</code> test periods, trains the models, computes the predictions and merges the actuals.</p>
+<table class="table">
+<colgroup>
+<col style="width: 6%">
+<col style="width: 25%">
+<col style="width: 34%">
+<col style="width: 34%">
+</colgroup>
+<thead>
+<tr class="header">
+<th></th>
+<th><strong>Type</strong></th>
+<th><strong>Default</strong></th>
+<th><strong>Details</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>df</td>
+<td>AnyDataFrame</td>
+<td></td>
+<td>Series data in long format.</td>
+</tr>
+<tr class="even">
+<td>n_windows</td>
+<td>int</td>
+<td></td>
+<td>Number of windows to evaluate.</td>
+</tr>
+<tr class="odd">
+<td>h</td>
+<td>int</td>
+<td></td>
+<td>Number of test periods in each window.</td>
+</tr>
+<tr class="even">
+<td>id_col</td>
+<td>str</td>
+<td>unique_id</td>
+<td>Column that identifies each serie.</td>
+</tr>
+<tr class="odd">
+<td>time_col</td>
+<td>str</td>
+<td>ds</td>
+<td>Column that identifies each timestep, its values can be timestamps or integers.</td>
+</tr>
+<tr class="even">
+<td>target_col</td>
+<td>str</td>
+<td>y</td>
+<td>Column that contains the target.</td>
+</tr>
+<tr class="odd">
+<td>step_size</td>
+<td>typing.Optional[int]</td>
+<td>None</td>
+<td>Step size between each cross validation window. If None it will be equal to <code>h</code>.</td>
+</tr>
+<tr class="even">
+<td>static_features</td>
+<td>typing.Optional[typing.List[str]]</td>
+<td>None</td>
+<td>Names of the features that are static and will be repeated when forecasting.</td>
+</tr>
+<tr class="odd">
+<td>dropna</td>
+<td>bool</td>
+<td>True</td>
+<td>Drop rows with missing values produced by the transformations.</td>
+</tr>
+<tr class="even">
+<td>keep_last_n</td>
+<td>typing.Optional[int]</td>
+<td>None</td>
+<td>Keep only these many records from each serie for the forecasting step. Can save time and memory if your features allow it.</td>
+</tr>
+<tr class="odd">
+<td>refit</td>
+<td>bool</td>
+<td>True</td>
+<td>Retrain model for each cross validation window.<br>If False, the models are trained at the beginning and then used to predict each window.</td>
+</tr>
+<tr class="even">
+<td>before_predict_callback</td>
+<td>typing.Optional[typing.Callable]</td>
+<td>None</td>
+<td>Function to call on the features before computing the predictions.<br> This function will take the input dataframe that will be passed to the model for predicting and should return a dataframe with the same structure.<br> The series identifier is on the index.</td>
+</tr>
+<tr class="odd">
+<td>after_predict_callback</td>
+<td>typing.Optional[typing.Callable]</td>
+<td>None</td>
+<td>Function to call on the predictions before updating the targets.<br> This function will take a pandas Series with the predictions and should return another one with the same structure.<br> The series identifier is on the index.</td>
+</tr>
+<tr class="even">
+<td>input_size</td>
+<td>typing.Optional[int]</td>
+<td>None</td>
+<td>Maximum training samples per serie in each window. If None, will use an expanding window.</td>
+</tr>
+<tr class="odd">
+<td>data</td>
+<td>typing.Optional[~AnyDataFrame]</td>
+<td>None</td>
+<td></td>
+</tr>
+<tr class="even">
+<td>window_size</td>
+<td>typing.Optional[int]</td>
+<td>None</td>
+<td></td>
+</tr>
+<tr class="odd">
+<td><strong>Returns</strong></td>
+<td><strong>AnyDataFrame</strong></td>
+<td></td>
+<td><strong>noqa: ARG002<br>noqa: ARG002</strong></td>
+</tr>
+</tbody>
+</table>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>fcst <span class="op">=</span> DistributedMLForecast(</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>    models<span class="op">=</span>[DaskLGBMForecast(), DaskXGBForecast()],</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">'D'</span>,</span>
+<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span>[<span class="dv">7</span>],</span>
+<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>    lag_transforms<span class="op">=</span>{</span>
+<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>        <span class="dv">1</span>: [expanding_mean],</span>
+<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>        <span class="dv">7</span>: [(rolling_mean, <span class="dv">14</span>)]</span>
+<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>    date_features<span class="op">=</span>[<span class="st">'dayofweek'</span>, <span class="st">'month'</span>],</span>
+<span id="cb20-10"><a href="#cb20-10" aria-hidden="true" tabindex="-1"></a>    num_threads<span class="op">=</span><span class="dv">1</span>,</span>
+<span id="cb20-11"><a href="#cb20-11" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>n_windows <span class="op">=</span> <span class="dv">2</span></span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>window_size <span class="op">=</span> <span class="dv">14</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb21-4"><a href="#cb21-4" aria-hidden="true" tabindex="-1"></a>cv_results <span class="op">=</span> fcst.cross_validation(</span>
+<span id="cb21-5"><a href="#cb21-5" aria-hidden="true" tabindex="-1"></a>    partitioned_series,</span>
+<span id="cb21-6"><a href="#cb21-6" aria-hidden="true" tabindex="-1"></a>    n_windows,</span>
+<span id="cb21-7"><a href="#cb21-7" aria-hidden="true" tabindex="-1"></a>    window_size,</span>
+<span id="cb21-8"><a href="#cb21-8" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb21-9"><a href="#cb21-9" aria-hidden="true" tabindex="-1"></a>cv_results</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>We can aggregate these by date to get a rough estimate of how our model is doing.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb22"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a>agg_results <span class="op">=</span> cv_results_df.drop(columns<span class="op">=</span><span class="st">'cutoff'</span>).groupby(<span class="st">'ds'</span>).mean()</span>
+<span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a>agg_results.head()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">DaskLGBMForecast</th>
+<th data-quarto-table-cell-role="th">DaskXGBForecast</th>
+<th data-quarto-table-cell-role="th">y</th>
+</tr>
+<tr class="odd">
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th"></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2001-04-17</td>
+<td>16.195230</td>
+<td>16.168709</td>
+<td>16.123231</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2001-04-18</td>
+<td>15.145318</td>
+<td>15.135734</td>
+<td>15.213920</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2001-04-19</td>
+<td>17.149119</td>
+<td>17.087150</td>
+<td>16.985699</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2001-04-20</td>
+<td>18.002781</td>
+<td>18.045092</td>
+<td>18.068340</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2001-04-21</td>
+<td>18.136612</td>
+<td>18.142144</td>
+<td>18.200609</td>
+</tr>
+</tbody>
+</table>
+
+</div>
+</div>
+</div>
+<p>We can also compute the error for each model.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="kw">def</span> mse_from_dask_dataframe(ddf):</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>    mses <span class="op">=</span> {}</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> model_name <span class="kw">in</span> ddf.columns.drop([<span class="st">'unique_id'</span>, <span class="st">'ds'</span>, <span class="st">'y'</span>, <span class="st">'cutoff'</span>]):</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>        mses[model_name] <span class="op">=</span> (ddf[<span class="st">'y'</span>] <span class="op">-</span> ddf[model_name]).<span class="bu">pow</span>(<span class="dv">2</span>).mean()</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>    <span class="cf">return</span> client.gather(client.compute(mses))</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>{k: <span class="bu">round</span>(v, <span class="dv">2</span>) <span class="cf">for</span> k, v <span class="kw">in</span> mse_from_dask_dataframe(cv_results).items()}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<pre><code>{'DaskLGBMForecast': 0.92, 'DaskXGBForecast': 0.86}</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>client.close()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="spark" class="level2">
+<h2 class="anchored" data-anchor-id="spark">Spark</h2>
+<section id="session-setup" class="level3">
+<h3 class="anchored" data-anchor-id="session-setup">Session setup</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> pyspark.sql <span class="im">import</span> SparkSession</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>spark <span class="op">=</span> (</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>    SparkSession.builder.appName(<span class="st">"MyApp"</span>)</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    .config(<span class="st">"spark.jars.packages"</span>, <span class="st">"com.microsoft.azure:synapseml_2.12:0.10.2"</span>)</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    .config(<span class="st">"spark.jars.repositories"</span>, <span class="st">"https://mmlspark.azureedge.net/maven"</span>)</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    .getOrCreate()</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="data-setup-1" class="level3">
+<h3 class="anchored" data-anchor-id="data-setup-1">Data setup</h3>
+<p>For spark, the data must be a <code>pyspark DataFrame</code>. You need to make sure that each time serie is only in one partition (which you can do using <code>repartitionByRange</code>, for example) and it is recommended that you have as many partitions as you have workers. If you have more partitions than workers make sure to set <code>num_threads=1</code> to avoid having nested parallelism.</p>
+<p>The required input format is the same as for <code>MLForecast</code>, i.e.&nbsp;it should have at least an id column, a time column and a target column.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>numPartitions <span class="op">=</span> <span class="dv">4</span></span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>series <span class="op">=</span> generate_daily_series(<span class="dv">100</span>, n_static_features<span class="op">=</span><span class="dv">2</span>, equal_ends<span class="op">=</span><span class="va">True</span>, static_as_categorical<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>spark_series <span class="op">=</span> spark.createDataFrame(series).repartitionByRange(numPartitions, <span class="st">'unique_id'</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="models-1" class="level3">
+<h3 class="anchored" data-anchor-id="models-1">Models</h3>
+<p>In order to perform distributed forecasting, we need to use a model that is able to train in a distributed way using <code>spark</code>. The current implementations are in <code>SparkLGBMForecast</code> and <code>SparkXGBForecast</code> which are just wrappers around the native implementations.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlforecast.distributed.models.spark.lgb <span class="im">import</span> SparkLGBMForecast</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>models <span class="op">=</span> [SparkLGBMForecast()]</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a><span class="cf">try</span>:</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> xgboost.spark <span class="im">import</span> SparkXGBRegressor</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    <span class="im">from</span> mlforecast.distributed.models.spark.xgb <span class="im">import</span> SparkXGBForecast</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>    models.append(SparkXGBForecast())</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a><span class="cf">except</span> <span class="pp">ModuleNotFoundError</span>:  <span class="co"># py &lt; 38</span></span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>    <span class="cf">pass</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="training-1" class="level3">
+<h3 class="anchored" data-anchor-id="training-1">Training</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb30"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb30-1"><a href="#cb30-1" aria-hidden="true" tabindex="-1"></a>fcst <span class="op">=</span> DistributedMLForecast(</span>
+<span id="cb30-2"><a href="#cb30-2" aria-hidden="true" tabindex="-1"></a>    models,</span>
+<span id="cb30-3"><a href="#cb30-3" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">'D'</span>,</span>
+<span id="cb30-4"><a href="#cb30-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span>[<span class="dv">1</span>],</span>
+<span id="cb30-5"><a href="#cb30-5" aria-hidden="true" tabindex="-1"></a>    lag_transforms<span class="op">=</span>{</span>
+<span id="cb30-6"><a href="#cb30-6" aria-hidden="true" tabindex="-1"></a>        <span class="dv">1</span>: [expanding_mean]</span>
+<span id="cb30-7"><a href="#cb30-7" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb30-8"><a href="#cb30-8" aria-hidden="true" tabindex="-1"></a>    date_features<span class="op">=</span>[<span class="st">'dayofweek'</span>],</span>
+<span id="cb30-9"><a href="#cb30-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb30-10"><a href="#cb30-10" aria-hidden="true" tabindex="-1"></a>fcst.fit(</span>
+<span id="cb30-11"><a href="#cb30-11" aria-hidden="true" tabindex="-1"></a>    spark_series,</span>
+<span id="cb30-12"><a href="#cb30-12" aria-hidden="true" tabindex="-1"></a>    static_features<span class="op">=</span>[<span class="st">'static_0'</span>, <span class="st">'static_1'</span>],</span>
+<span id="cb30-13"><a href="#cb30-13" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="forecasting-1" class="level3">
+<h3 class="anchored" data-anchor-id="forecasting-1">Forecasting</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>preds <span class="op">=</span> fcst.predict(<span class="dv">14</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a>preds.toPandas()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stderr">
+<pre><code>                                                                                </code></pre>
+</div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">SparkLGBMForecast</th>
+<th data-quarto-table-cell-role="th">SparkXGBForecast</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>id_00</td>
+<td>2001-05-15</td>
+<td>42.213984</td>
+<td>42.305004</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>id_00</td>
+<td>2001-05-16</td>
+<td>49.718021</td>
+<td>50.262386</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>id_00</td>
+<td>2001-05-17</td>
+<td>1.306248</td>
+<td>1.912686</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>id_00</td>
+<td>2001-05-18</td>
+<td>10.060104</td>
+<td>10.240939</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>id_00</td>
+<td>2001-05-19</td>
+<td>18.070785</td>
+<td>18.265749</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1395</td>
+<td>id_99</td>
+<td>2001-05-24</td>
+<td>43.426901</td>
+<td>43.780163</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1396</td>
+<td>id_99</td>
+<td>2001-05-25</td>
+<td>1.361680</td>
+<td>2.097803</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1397</td>
+<td>id_99</td>
+<td>2001-05-26</td>
+<td>8.787283</td>
+<td>8.593580</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1398</td>
+<td>id_99</td>
+<td>2001-05-27</td>
+<td>15.551965</td>
+<td>15.622238</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1399</td>
+<td>id_99</td>
+<td>2001-05-28</td>
+<td>22.518518</td>
+<td>22.943216</td>
+</tr>
+</tbody>
+</table>
+
+<p>1400 rows × 4 columns</p>
+</div>
+</div>
+</div>
+</section>
+<section id="cross-validation-1" class="level3">
+<h3 class="anchored" data-anchor-id="cross-validation-1">Cross validation</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>cv_res <span class="op">=</span> fcst.cross_validation(</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>    spark_series,</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>    n_windows<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>    window_size<span class="op">=</span><span class="dv">14</span>,</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a>).toPandas()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb35"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb35-1"><a href="#cb35-1" aria-hidden="true" tabindex="-1"></a>cv_res</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">SparkLGBMForecast</th>
+<th data-quarto-table-cell-role="th">SparkXGBForecast</th>
+<th data-quarto-table-cell-role="th">cutoff</th>
+<th data-quarto-table-cell-role="th">y</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>id_17</td>
+<td>2001-04-30</td>
+<td>31.467849</td>
+<td>31.676336</td>
+<td>2001-04-16</td>
+<td>30.832464</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>id_07</td>
+<td>2001-04-17</td>
+<td>1.015429</td>
+<td>1.039312</td>
+<td>2001-04-16</td>
+<td>1.034871</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>id_06</td>
+<td>2001-04-29</td>
+<td>21.133919</td>
+<td>1.368022</td>
+<td>2001-04-16</td>
+<td>0.944155</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>id_11</td>
+<td>2001-04-17</td>
+<td>57.069013</td>
+<td>57.591526</td>
+<td>2001-04-16</td>
+<td>57.406090</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>id_12</td>
+<td>2001-04-27</td>
+<td>7.965585</td>
+<td>7.741258</td>
+<td>2001-04-16</td>
+<td>8.498222</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2795</td>
+<td>id_96</td>
+<td>2001-05-12</td>
+<td>9.069598</td>
+<td>8.925149</td>
+<td>2001-04-30</td>
+<td>7.983343</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2796</td>
+<td>id_84</td>
+<td>2001-05-04</td>
+<td>10.474623</td>
+<td>9.959846</td>
+<td>2001-04-30</td>
+<td>10.683266</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2797</td>
+<td>id_87</td>
+<td>2001-05-07</td>
+<td>2.162316</td>
+<td>2.065432</td>
+<td>2001-04-30</td>
+<td>1.277810</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2798</td>
+<td>id_80</td>
+<td>2001-05-11</td>
+<td>22.679552</td>
+<td>20.547785</td>
+<td>2001-04-30</td>
+<td>19.823192</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2799</td>
+<td>id_90</td>
+<td>2001-05-08</td>
+<td>40.225448</td>
+<td>40.293419</td>
+<td>2001-04-30</td>
+<td>39.215204</td>
+</tr>
+</tbody>
+</table>
+
+<p>2800 rows × 6 columns</p>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>spark.stop()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="ray" class="level2">
+<h2 class="anchored" data-anchor-id="ray">Ray</h2>
+<section id="session-setup-1" class="level3">
+<h3 class="anchored" data-anchor-id="session-setup-1">Session setup</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="im">import</span> ray</span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> ray.cluster_utils <span class="im">import</span> Cluster</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>ray_cluster <span class="op">=</span> Cluster(</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>    initialize_head<span class="op">=</span><span class="va">True</span>,</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a>    head_node_args<span class="op">=</span>{<span class="st">"num_cpus"</span>: <span class="dv">2</span>}</span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>ray.init(address<span class="op">=</span>ray_cluster.address, ignore_reinit_error<span class="op">=</span><span class="va">True</span>)</span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a><span class="co"># add mock node to simulate a cluster</span></span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>mock_node <span class="op">=</span> ray_cluster.add_node(num_cpus<span class="op">=</span><span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="data-setup-2" class="level3">
+<h3 class="anchored" data-anchor-id="data-setup-2">Data setup</h3>
+<p>For ray, the data must be a <code>ray DataFrame</code>. It is recommended that you have as many partitions as you have workers. If you have more partitions than workers make sure to set <code>num_threads=1</code> to avoid having nested parallelism.</p>
+<p>The required input format is the same as for <code>MLForecast</code>, i.e.&nbsp;it should have at least an id column, a time column and a target column.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb39"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb39-1"><a href="#cb39-1" aria-hidden="true" tabindex="-1"></a>series <span class="op">=</span> generate_daily_series(<span class="dv">100</span>, n_static_features<span class="op">=</span><span class="dv">2</span>, equal_ends<span class="op">=</span><span class="va">True</span>, static_as_categorical<span class="op">=</span><span class="va">False</span>)</span>
+<span id="cb39-2"><a href="#cb39-2" aria-hidden="true" tabindex="-1"></a><span class="co"># we need noncategory unique_id</span></span>
+<span id="cb39-3"><a href="#cb39-3" aria-hidden="true" tabindex="-1"></a>series[<span class="st">'unique_id'</span>] <span class="op">=</span> series[<span class="st">'unique_id'</span>].astype(<span class="bu">str</span>)</span>
+<span id="cb39-4"><a href="#cb39-4" aria-hidden="true" tabindex="-1"></a>ray_series <span class="op">=</span> ray.data.from_pandas(series)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="models-2" class="level3">
+<h3 class="anchored" data-anchor-id="models-2">Models</h3>
+<p>The ray integration allows to include <code>lightgbm</code> (<code>RayLGBMRegressor</code>), and <code>xgboost</code> (<code>RayXGBRegressor</code>).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlforecast.distributed.models.ray.lgb <span class="im">import</span> RayLGBMForecast</span>
+<span id="cb40-2"><a href="#cb40-2" aria-hidden="true" tabindex="-1"></a><span class="im">from</span> mlforecast.distributed.models.ray.xgb <span class="im">import</span> RayXGBForecast</span>
+<span id="cb40-3"><a href="#cb40-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb40-4"><a href="#cb40-4" aria-hidden="true" tabindex="-1"></a>models <span class="op">=</span> [</span>
+<span id="cb40-5"><a href="#cb40-5" aria-hidden="true" tabindex="-1"></a>    RayLGBMForecast(),</span>
+<span id="cb40-6"><a href="#cb40-6" aria-hidden="true" tabindex="-1"></a>    RayXGBForecast(),</span>
+<span id="cb40-7"><a href="#cb40-7" aria-hidden="true" tabindex="-1"></a>]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="training-2" class="level3">
+<h3 class="anchored" data-anchor-id="training-2">Training</h3>
+<p>To control the number of partitions to use using Ray, we have to include <code>num_partitions</code> to <code>DistributedMLForecast</code>.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>num_partitions <span class="op">=</span> <span class="dv">4</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb42"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a>fcst <span class="op">=</span> DistributedMLForecast(</span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>    models,</span>
+<span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a>    freq<span class="op">=</span><span class="st">'D'</span>,</span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a>    lags<span class="op">=</span>[<span class="dv">1</span>],</span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>    lag_transforms<span class="op">=</span>{</span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>        <span class="dv">1</span>: [expanding_mean]</span>
+<span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a>    },</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a>    date_features<span class="op">=</span>[<span class="st">'dayofweek'</span>],</span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>    num_partitions<span class="op">=</span>num_partitions, <span class="co"># Use num_partitions to reduce overhead</span></span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a>fcst.fit(</span>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a>    ray_series,</span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>    static_features<span class="op">=</span>[<span class="st">'static_0'</span>, <span class="st">'static_1'</span>],</span>
+<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="forecasting-2" class="level3">
+<h3 class="anchored" data-anchor-id="forecasting-2">Forecasting</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb43"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb43-1"><a href="#cb43-1" aria-hidden="true" tabindex="-1"></a>preds <span class="op">=</span> fcst.predict(<span class="dv">14</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb44"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb44-1"><a href="#cb44-1" aria-hidden="true" tabindex="-1"></a>preds.to_pandas()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">RayLGBMForecast</th>
+<th data-quarto-table-cell-role="th">RayXGBForecast</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>id_00</td>
+<td>2001-05-15</td>
+<td>42.213984</td>
+<td>41.992321</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>id_00</td>
+<td>2001-05-16</td>
+<td>49.718021</td>
+<td>50.999878</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>id_00</td>
+<td>2001-05-17</td>
+<td>1.306248</td>
+<td>1.712625</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>id_00</td>
+<td>2001-05-18</td>
+<td>10.060104</td>
+<td>10.157331</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>id_00</td>
+<td>2001-05-19</td>
+<td>18.070785</td>
+<td>18.163649</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1395</td>
+<td>id_99</td>
+<td>2001-05-24</td>
+<td>43.426901</td>
+<td>42.060478</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1396</td>
+<td>id_99</td>
+<td>2001-05-25</td>
+<td>1.361680</td>
+<td>2.587303</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1397</td>
+<td>id_99</td>
+<td>2001-05-26</td>
+<td>8.787283</td>
+<td>8.652343</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1398</td>
+<td>id_99</td>
+<td>2001-05-27</td>
+<td>15.551965</td>
+<td>15.278493</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">1399</td>
+<td>id_99</td>
+<td>2001-05-28</td>
+<td>22.518518</td>
+<td>22.898369</td>
+</tr>
+</tbody>
+</table>
+
+<p>1400 rows × 4 columns</p>
+</div>
+</div>
+</div>
+</section>
+<section id="cross-validation-2" class="level3">
+<h3 class="anchored" data-anchor-id="cross-validation-2">Cross validation</h3>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb45"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb45-1"><a href="#cb45-1" aria-hidden="true" tabindex="-1"></a>cv_res <span class="op">=</span> fcst.cross_validation(</span>
+<span id="cb45-2"><a href="#cb45-2" aria-hidden="true" tabindex="-1"></a>    ray_series,</span>
+<span id="cb45-3"><a href="#cb45-3" aria-hidden="true" tabindex="-1"></a>    n_windows<span class="op">=</span><span class="dv">2</span>,</span>
+<span id="cb45-4"><a href="#cb45-4" aria-hidden="true" tabindex="-1"></a>    window_size<span class="op">=</span><span class="dv">14</span>,</span>
+<span id="cb45-5"><a href="#cb45-5" aria-hidden="true" tabindex="-1"></a>).to_pandas()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb46"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb46-1"><a href="#cb46-1" aria-hidden="true" tabindex="-1"></a>cv_res</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-display">
+<div>
+
+
+<table class="dataframe table table-sm table-striped small" data-quarto-postprocess="true" data-border="1">
+<thead>
+<tr class="header">
+<th data-quarto-table-cell-role="th"></th>
+<th data-quarto-table-cell-role="th">unique_id</th>
+<th data-quarto-table-cell-role="th">ds</th>
+<th data-quarto-table-cell-role="th">RayLGBMForecast</th>
+<th data-quarto-table-cell-role="th">RayXGBForecast</th>
+<th data-quarto-table-cell-role="th">cutoff</th>
+<th data-quarto-table-cell-role="th">y</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">0</td>
+<td>id_00</td>
+<td>2001-04-17</td>
+<td>41.395948</td>
+<td>41.968201</td>
+<td>2001-04-16</td>
+<td>40.499332</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">1</td>
+<td>id_00</td>
+<td>2001-04-18</td>
+<td>50.004670</td>
+<td>50.191704</td>
+<td>2001-04-16</td>
+<td>50.888323</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2</td>
+<td>id_00</td>
+<td>2001-04-19</td>
+<td>1.821105</td>
+<td>1.978645</td>
+<td>2001-04-16</td>
+<td>0.121812</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">3</td>
+<td>id_00</td>
+<td>2001-04-20</td>
+<td>10.266459</td>
+<td>10.211697</td>
+<td>2001-04-16</td>
+<td>10.987977</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">4</td>
+<td>id_00</td>
+<td>2001-04-21</td>
+<td>18.285400</td>
+<td>17.944368</td>
+<td>2001-04-16</td>
+<td>16.370385</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2795</td>
+<td>id_69</td>
+<td>2001-05-07</td>
+<td>2.151752</td>
+<td>1.971745</td>
+<td>2001-04-30</td>
+<td>0.768383</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2796</td>
+<td>id_82</td>
+<td>2001-05-09</td>
+<td>29.733492</td>
+<td>29.844685</td>
+<td>2001-04-30</td>
+<td>29.584063</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2797</td>
+<td>id_80</td>
+<td>2001-05-03</td>
+<td>14.978611</td>
+<td>15.564403</td>
+<td>2001-04-30</td>
+<td>14.888339</td>
+</tr>
+<tr class="even">
+<td data-quarto-table-cell-role="th">2798</td>
+<td>id_28</td>
+<td>2001-05-10</td>
+<td>18.204017</td>
+<td>16.644882</td>
+<td>2001-04-30</td>
+<td>16.512652</td>
+</tr>
+<tr class="odd">
+<td data-quarto-table-cell-role="th">2799</td>
+<td>id_93</td>
+<td>2001-05-01</td>
+<td>29.756173</td>
+<td>29.035599</td>
+<td>2001-04-30</td>
+<td>29.340027</td>
+</tr>
+</tbody>
+</table>
+
+<p>2800 rows × 6 columns</p>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb47"><pre class="sourceCode python code-with-copy"><code class="sourceCode python"><span id="cb47-1"><a href="#cb47-1" aria-hidden="true" tabindex="-1"></a>ray.shutdown()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+
+
+</section>
+</section>
+
+<p>Give us a ⭐ on <a href="https://github.com/nixtla/mlforecast">Github</a></p></main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button', {
+    text: function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+  });
+  clipboard.on('success', function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  });
+  function tippyHover(el, contentFn) {
+    const config = {
+      allowHTML: true,
+      content: contentFn,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start'
+    };
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      return note.innerHTML;
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+</body></html>
