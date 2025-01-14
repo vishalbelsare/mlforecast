@@ -17,13 +17,14 @@ website:
     image: "https://github.com/Nixtla/styles/blob/2abf51612584169874c90cd7c4d347e3917eaf73/images/Banner%20Github.png"
   google-analytics: "G-NXJNCVR18L"
   repo-actions: [issue]
+  favicon: favicon.png
   navbar:
     background: primary
     search: true
     collapse-below: lg
     left:
       - text: "Get Started"
-        href: docs/quick_start_local.ipynb
+        href: docs/getting-started/quick_start_local.ipynb
       - text: "NixtlaVerse"
         menu:
           - text: "StatsForecast ⚡️"

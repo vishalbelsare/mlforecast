@@ -13,16 +13,16 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tupl
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
+from utilsforecast.processing import backtest_splits
 
 from mlforecast.core import (
     DateFeature,
     Freq,
     LagTransforms,
     Lags,
+    TargetTransform,
     TimeSeries,
 )
-from .utils import backtest_splits, old_kw_to_pos
-from .target_transforms import BaseTargetTransform
 
 # %% ../nbs/lgb_cv.ipynb 5
 def _mape(y_true, y_pred, ids, _dates):
@@ -52,10 +52,9 @@ def _predict(ts, bst, valid, h, before_predict_callback, after_predict_callback)
         X_df = None
     preds = ts.predict(
         {"Booster": bst},
-        h,
-        None,
-        before_predict_callback,
-        after_predict_callback,
+        horizon=h,
+        before_predict_callback=before_predict_callback,
+        after_predict_callback=after_predict_callback,
         X_df=X_df,
     )
     return valid.merge(preds, on=[ts.id_col, ts.time_col], how="left")
@@ -74,19 +73,18 @@ CVResult = Tuple[int, float]
 class LightGBMCV:
     def __init__(
         self,
-        freq: Optional[Freq] = None,
+        freq: Freq,
         lags: Optional[Lags] = None,
         lag_transforms: Optional[LagTransforms] = None,
         date_features: Optional[Iterable[DateFeature]] = None,
-        differences: Optional[Iterable[int]] = None,
         num_threads: int = 1,
-        target_transforms: Optional[List[BaseTargetTransform]] = None,
+        target_transforms: Optional[List[TargetTransform]] = None,
     ):
         """Create LightGBM CV object.
 
         Parameters
         ----------
-        freq : str or int, optional (default=None)
+        freq : str or int
             Pandas offset alias, e.g. 'D', 'W-THU' or integer denoting the frequency of the series.
         lags : list of int, optional (default=None)
             Lags of the target to use as features.
@@ -94,8 +92,6 @@ class LightGBMCV:
             Mapping of target lags to their transformations.
         date_features : list of str or callable, optional (default=None)
             Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
-        differences : list of int, optional (default=None)
-            Differences to take of the target before computing the features. These are restored at the forecasting step.
         num_threads : int (default=1)
             Number of threads to use when computing the features.
         target_transforms : list of transformers, optional(default=None)
@@ -113,7 +109,6 @@ class LightGBMCV:
             lags=lags,
             lag_transforms=lag_transforms,
             date_features=date_features,
-            differences=differences,
             num_threads=self.bst_threads,
             target_transforms=target_transforms,
         )
@@ -128,7 +123,6 @@ class LightGBMCV:
             f"bst_threads={self.bst_threads})"
         )
 
-    @old_kw_to_pos(["data", "window_size"], [1, 3])
     def setup(
         self,
         df: pd.DataFrame,
@@ -145,9 +139,6 @@ class LightGBMCV:
         weights: Optional[Sequence[float]] = None,
         metric: Union[str, Callable] = "mape",
         input_size: Optional[int] = None,
-        *,
-        data: Optional[pd.DataFrame] = None,  # noqa: ARG002
-        window_size: Optional[int] = None,  # noqa: ARG002
     ):
         """Initialize internal data structures to iteratively train the boosters. Use this before calling partial_fit.
 
@@ -181,10 +172,6 @@ class LightGBMCV:
             Metric used to assess the performance of the models and perform early stopping.
         input_size : int, optional (default=None)
             Maximum training samples per serie in each window. If None, will use an expanding window.
-        data : pandas DataFrame
-            Series data in long format. This argument has been replaced by df and will be removed in a later release.
-        window_size : int
-            Forecast horizon. This argument has been replaced by h and will be removed in a later release.
 
         Returns
         -------
@@ -207,10 +194,6 @@ class LightGBMCV:
                 )
             self.metric_fn = _metric2fn[metric]
             self.metric_name = metric
-        if np.issubdtype(df[time_col].dtype.type, np.integer):
-            freq = 1
-        else:
-            freq = self.ts.freq
         self.items = []
         self.h = h
         self.id_col = id_col
@@ -223,7 +206,7 @@ class LightGBMCV:
             h=h,
             id_col=id_col,
             time_col=time_col,
-            freq=freq,
+            freq=self.ts.freq,
             step_size=step_size,
             input_size=input_size,
         )
@@ -238,6 +221,7 @@ class LightGBMCV:
                 dropna,
                 keep_last_n,
             )
+            assert isinstance(prep, pd.DataFrame)
             ds = lgb.Dataset(
                 prep.drop(columns=[id_col, time_col, target_col]), prep[target_col]
             ).construct()
@@ -359,7 +343,6 @@ class LightGBMCV:
                 best_iter = r
         return best_iter
 
-    @old_kw_to_pos(["data", "window_size"], [1, 3])
     def fit(
         self,
         df: pd.DataFrame,
@@ -384,9 +367,6 @@ class LightGBMCV:
         before_predict_callback: Optional[Callable] = None,
         after_predict_callback: Optional[Callable] = None,
         input_size: Optional[int] = None,
-        *,
-        data: Optional[pd.DataFrame] = None,  # noqa: ARG002
-        window_size: Optional[int] = None,  # noqa: ARG002
     ) -> List[CVResult]:
         """Train boosters simultaneously and assess their performance on the complete forecasting window.
 
@@ -440,10 +420,6 @@ class LightGBMCV:
                 The series identifier is on the index.
         input_size : int, optional (default=None)
             Maximum training samples per serie in each window. If None, will use an expanding window.
-        data : pandas DataFrame
-            Series data in long format. This argument has been replaced by df and will be removed in a later release.
-        window_size : int
-            Forecast horizon. This argument has been replaced by h and will be removed in a later release.
 
         Returns
         -------
@@ -503,18 +479,15 @@ class LightGBMCV:
                     [f.result().assign(window=i) for i, f in enumerate(futures)]
                 )
         self.ts._fit(df, id_col, time_col, target_col, static_features, keep_last_n)
+        self.ts.as_numpy = False
         return hist
 
-    @old_kw_to_pos(["horizon"], [1])
     def predict(
         self,
         h: int,
-        dynamic_dfs: Optional[List[pd.DataFrame]] = None,
         before_predict_callback: Optional[Callable] = None,
         after_predict_callback: Optional[Callable] = None,
         X_df: Optional[pd.DataFrame] = None,
-        *,
-        horizon: Optional[int] = None,  # noqa: ARG002
     ) -> pd.DataFrame:
         """Compute predictions with each of the trained boosters.
 
@@ -522,8 +495,6 @@ class LightGBMCV:
         ----------
         h : int
             Forecast horizon.
-        dynamic_dfs : list of pandas DataFrame, optional (default=None)
-            Future values of the dynamic features, e.g. prices.
         before_predict_callback : callable, optional (default=None)
             Function to call on the features before computing the predictions.
                 This function will take the input dataframe that will be passed to the model for predicting and should return a dataframe with the same structure.
@@ -534,8 +505,6 @@ class LightGBMCV:
                 The series identifier is on the index.
         X_df : pandas DataFrame, optional (default=None)
             Dataframe with the future exogenous features. Should have the id column and the time column.
-        horizon : int
-            Forecast horizon. This argument has been replaced by h and will be removed in a later release.
 
         Returns
         -------
@@ -544,9 +513,8 @@ class LightGBMCV:
         """
         return self.ts.predict(
             self.cv_models_,
-            h,
-            dynamic_dfs,
-            before_predict_callback,
-            after_predict_callback,
+            horizon=h,
+            before_predict_callback=before_predict_callback,
+            after_predict_callback=after_predict_callback,
             X_df=X_df,
         )

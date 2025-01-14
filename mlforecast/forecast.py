@@ -5,12 +5,17 @@ __all__ = ['MLForecast']
 
 # %% ../nbs/forecast.ipynb 3
 import copy
+import re
 import warnings
+from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
+import cloudpickle
+import fsspec
 import numpy as np
-import pandas as pd
+import utilsforecast.processing as ufp
 from sklearn.base import BaseEstimator, clone
+from utilsforecast.compat import DFType, DataFrame
 
 from mlforecast.core import (
     DateFeature,
@@ -18,75 +23,77 @@ from mlforecast.core import (
     LagTransforms,
     Lags,
     Models,
+    TargetTransform,
     TimeSeries,
     _name_models,
+    _get_model_name,
 )
+from .grouped_array import GroupedArray
 
 if TYPE_CHECKING:
     from mlforecast.lgb_cv import LightGBMCV
-from .target_transforms import BaseTargetTransform
-from .utils import PredictionIntervals, backtest_splits, old_kw_to_pos
+from .target_transforms import _BaseGroupedArrayTargetTransform
+from .utils import PredictionIntervals
 
 # %% ../nbs/forecast.ipynb 6
 def _add_conformal_distribution_intervals(
-    fcst_df: pd.DataFrame,
-    cs_df: pd.DataFrame,
+    fcst_df: DFType,
+    cs_df: DFType,
     model_names: List[str],
     level: List[Union[int, float]],
     cs_n_windows: int,
     cs_h: int,
     n_series: int,
     horizon: int,
-) -> pd.DataFrame:
+) -> DFType:
     """
     Adds conformal intervals to a `fcst_df` based on conformal scores `cs_df`.
     `level` should be already sorted. This strategy creates forecasts paths
     based on errors and calculate quantiles using those paths.
     """
-    fcst_df = fcst_df.copy()
+    fcst_df = ufp.copy_if_pandas(fcst_df, deep=False)
     alphas = [100 - lv for lv in level]
     cuts = [alpha / 200 for alpha in reversed(alphas)]
     cuts.extend(1 - alpha / 200 for alpha in alphas)
     for model in model_names:
-        scores = cs_df[model].values.reshape(cs_n_windows, n_series, cs_h)
+        scores = cs_df[model].to_numpy().reshape(cs_n_windows, n_series, cs_h)
         # restrict scores to horizon
         scores = scores[:, :, :horizon]
-        mean = fcst_df[model].values.reshape(1, n_series, -1)
+        mean = fcst_df[model].to_numpy().reshape(1, n_series, -1)
         scores = np.vstack([mean - scores, mean + scores])
         quantiles = np.quantile(
             scores,
             cuts,
             axis=0,
         )
-        quantiles = quantiles.reshape(len(cuts), -1)
+        quantiles = quantiles.reshape(len(cuts), -1).T
         lo_cols = [f"{model}-lo-{lv}" for lv in reversed(level)]
         hi_cols = [f"{model}-hi-{lv}" for lv in level]
         out_cols = lo_cols + hi_cols
-        for i, col in enumerate(out_cols):
-            fcst_df[col] = quantiles[i]
+        fcst_df = ufp.assign_columns(fcst_df, out_cols, quantiles)
     return fcst_df
 
 # %% ../nbs/forecast.ipynb 7
 def _add_conformal_error_intervals(
-    fcst_df: pd.DataFrame,
-    cs_df: pd.DataFrame,
+    fcst_df: DFType,
+    cs_df: DFType,
     model_names: List[str],
     level: List[Union[int, float]],
     cs_n_windows: int,
     cs_h: int,
     n_series: int,
     horizon: int,
-) -> pd.DataFrame:
+) -> DFType:
     """
     Adds conformal intervals to a `fcst_df` based on conformal scores `cs_df`.
     `level` should be already sorted. This startegy creates prediction intervals
     based on the absolute errors.
     """
-    fcst_df = fcst_df.copy()
+    fcst_df = ufp.copy_if_pandas(fcst_df, deep=False)
     cuts = [lv / 100 for lv in level]
     for model in model_names:
-        mean = fcst_df[model].values.ravel()
-        scores = cs_df[model].values.reshape(cs_n_windows, n_series, cs_h)
+        mean = fcst_df[model].to_numpy().ravel()
+        scores = cs_df[model].to_numpy().reshape(cs_n_windows, n_series, cs_h)
         # restrict scores to horizon
         scores = scores[:, :, :horizon]
         quantiles = np.quantile(
@@ -97,10 +104,9 @@ def _add_conformal_error_intervals(
         quantiles = quantiles.reshape(len(cuts), -1)
         lo_cols = [f"{model}-lo-{lv}" for lv in reversed(level)]
         hi_cols = [f"{model}-hi-{lv}" for lv in level]
-        for i, col in enumerate(lo_cols):
-            fcst_df[col] = mean - quantiles[len(level) - 1 - i]
-        for i, col in enumerate(hi_cols):
-            fcst_df[col] = mean + quantiles[i]
+        quantiles = np.vstack([mean - quantiles[::-1], mean + quantiles]).T
+        columns = lo_cols + hi_cols
+        fcst_df = ufp.assign_columns(fcst_df, columns, quantiles)
     return fcst_df
 
 # %% ../nbs/forecast.ipynb 8
@@ -121,13 +127,13 @@ class MLForecast:
     def __init__(
         self,
         models: Models,
-        freq: Optional[Freq] = None,
+        freq: Freq,
         lags: Optional[Lags] = None,
         lag_transforms: Optional[LagTransforms] = None,
         date_features: Optional[Iterable[DateFeature]] = None,
-        differences: Optional[Iterable[int]] = None,
         num_threads: int = 1,
-        target_transforms: Optional[List[BaseTargetTransform]] = None,
+        target_transforms: Optional[List[TargetTransform]] = None,
+        lag_transforms_namer: Optional[Callable] = None,
     ):
         """Forecasting pipeline
 
@@ -135,7 +141,7 @@ class MLForecast:
         ----------
         models : regressor or list of regressors
             Models that will be trained and used to compute the forecasts.
-        freq : str or int or pd.offsets.BaseOffset, optional (default=None)
+        freq : str or int or pd.offsets.BaseOffset
             Pandas offset, pandas offset alias, e.g. 'D', 'W-THU' or integer denoting the frequency of the series.
         lags : list of int, optional (default=None)
             Lags of the target to use as features.
@@ -143,17 +149,17 @@ class MLForecast:
             Mapping of target lags to their transformations.
         date_features : list of str or callable, optional (default=None)
             Features computed from the dates. Can be pandas date attributes or functions that will take the dates as input.
-        differences : list of int, optional (default=None)
-            Differences to take of the target before computing the features. These are restored at the forecasting step.
         num_threads : int (default=1)
             Number of threads to use when computing the features.
         target_transforms : list of transformers, optional(default=None)
             Transformations that will be applied to the target before computing the features and restored after the forecasting step.
+        lag_transforms_namer : callable, optional(default=None)
+            Function that takes a transformation (either function or class), a lag and extra arguments and produces a name.
         """
         if not isinstance(models, dict) and not isinstance(models, list):
             models = [models]
         if isinstance(models, list):
-            model_names = _name_models([m.__class__.__name__ for m in models])
+            model_names = _name_models([_get_model_name(m) for m in models])
             models_with_names = dict(zip(model_names, models))
         else:
             models_with_names = models
@@ -163,9 +169,9 @@ class MLForecast:
             lags=lags,
             lag_transforms=lag_transforms,
             date_features=date_features,
-            differences=differences,
             num_threads=num_threads,
             target_transforms=target_transforms,
+            lag_transforms_namer=lag_transforms_namer,
         )
 
     def __repr__(self):
@@ -188,15 +194,17 @@ class MLForecast:
         import lightgbm as lgb
 
         fcst = cls(
-            lgb.LGBMRegressor(**{**cv.params, "n_estimators": cv.best_iteration_})
+            models=lgb.LGBMRegressor(
+                **{**cv.params, "n_estimators": cv.best_iteration_}
+            ),
+            freq=cv.ts.freq,
         )
         fcst.ts = copy.deepcopy(cv.ts)
         return fcst
 
-    @old_kw_to_pos(["data"], [1])
     def preprocess(
         self,
-        df: pd.DataFrame,
+        df: DFType,
         id_col: str = "unique_id",
         time_col: str = "ds",
         target_col: str = "y",
@@ -205,9 +213,9 @@ class MLForecast:
         keep_last_n: Optional[int] = None,
         max_horizon: Optional[int] = None,
         return_X_y: bool = False,
-        *,
-        data: Optional[pd.DataFrame] = None,  # noqa: ARG002
-    ) -> Union[pd.DataFrame, Tuple[pd.DataFrame, Union[pd.Series, pd.DataFrame]]]:
+        as_numpy: bool = False,
+        weight_col: Optional[str] = None,
+    ) -> Union[DFType, Tuple[DFType, np.ndarray]]:
         """Add the features to `data`.
 
         Parameters
@@ -226,16 +234,18 @@ class MLForecast:
             Drop rows with missing values produced by the transformations.
         keep_last_n : int, optional (default=None)
             Keep only these many records from each serie for the forecasting step. Can save time and memory if your features allow it.
-        max_horizon: int, optional (default=None)
+        max_horizon : int, optional (default=None)
             Train this many models, where each model will predict a specific horizon.
-        return_X_y: bool (default=False)
+        return_X_y : bool (default=False)
             Return a tuple with the features and the target. If False will return a single dataframe.
-        data : pandas DataFrame
-            Series data in long format. This argument has been replaced by df and will be removed in a later release.
+        as_numpy : bool (default = False)
+            Cast features to numpy array. Only works for `return_X_y=True`.
+        weight_col : str, optional (default=None)
+            Column that contains the sample weights.
 
         Returns
         -------
-        result : pandas DataFrame or tuple of pandas Dataframe and either a pandas Series or a pandas Dataframe (for multi-output regression).
+        result : DataFrame or tuple of pandas Dataframe and a numpy array.
             `df` plus added features and target(s).
         """
         return self.ts.fit_transform(
@@ -248,20 +258,22 @@ class MLForecast:
             keep_last_n=keep_last_n,
             max_horizon=max_horizon,
             return_X_y=return_X_y,
+            as_numpy=as_numpy,
+            weight_col=weight_col,
         )
 
     def fit_models(
         self,
-        X: pd.DataFrame,
-        y: Union[pd.Series, pd.DataFrame],
+        X: Union[DataFrame, np.ndarray],
+        y: np.ndarray,
     ) -> "MLForecast":
-        """Manually train models. Use this if you called `Forecast.preprocess` beforehand.
+        """Manually train models. Use this if you called `MLForecast.preprocess` beforehand.
 
         Parameters
         ----------
-        X : pandas DataFrame
+        X : pandas or polars DataFrame or numpy array
             Features.
-        y : pandas Series or pandas DataFrame (multi-output).
+        y : numpy array.
             Target.
 
         Returns
@@ -269,22 +281,36 @@ class MLForecast:
         self : MLForecast
             Forecast object with trained models.
         """
+
+        def fit_model(model, X, y, weight_col):
+            fit_kwargs = {}
+            if weight_col is not None:
+                if isinstance(X, np.ndarray):
+                    fit_kwargs["sample_weight"] = X[:, 0]
+                    X = X[:, 1:]
+                else:
+                    fit_kwargs["sample_weight"] = X[weight_col]
+                    X = ufp.drop_columns(X, weight_col)
+            return clone(model).fit(X, y, **fit_kwargs)
+
         self.models_: Dict[str, Union[BaseEstimator, List[BaseEstimator]]] = {}
         for name, model in self.models.items():
             if y.ndim == 2 and y.shape[1] > 1:
                 self.models_[name] = []
                 for col in range(y.shape[1]):
                     keep = ~np.isnan(y[:, col])
+                    Xh = ufp.filter_with_mask(X, keep)
+                    yh = y[keep, col]
                     self.models_[name].append(
-                        clone(model).fit(X.loc[keep], y[keep, col])
+                        fit_model(model, Xh, yh, self.ts.weight_col)
                     )
             else:
-                self.models_[name] = clone(model).fit(X, y)
+                self.models_[name] = fit_model(model, X, y, self.ts.weight_col)
         return self
 
     def _conformity_scores(
         self,
-        df: pd.DataFrame,
+        df: DFType,
         id_col: str,
         time_col: str,
         target_col: str,
@@ -294,7 +320,8 @@ class MLForecast:
         max_horizon: Optional[int] = None,
         n_windows: int = 2,
         h: int = 1,
-    ):
+        as_numpy: bool = False,
+    ) -> DFType:
         """Compute conformity scores.
 
         We need at least two cross validation errors to compute
@@ -305,6 +332,14 @@ class MLForecast:
         In this simplest case, we assume the width of the interval
         is the same for all the forecasting horizon (`h=1`).
         """
+        min_size = ufp.counts_by_id(df, id_col)["counts"].min()
+        min_samples = h * n_windows + 1
+        if min_size < min_samples:
+            raise ValueError(
+                "Minimum required samples in each serie for the prediction intervals "
+                f"settings are: {min_samples}, shortest serie has: {min_size}. "
+                "Please reduce the number of windows, horizon or remove those series."
+            )
         cv_results = self.cross_validation(
             df=df,
             n_windows=n_windows,
@@ -318,17 +353,123 @@ class MLForecast:
             keep_last_n=keep_last_n,
             max_horizon=max_horizon,
             prediction_intervals=None,
+            as_numpy=as_numpy,
         )
         # conformity score for each model
         for model in self.models.keys():
             # compute absolute error for each model
-            cv_results[model] = np.abs(cv_results[model] - cv_results[target_col])
-        return cv_results.drop(columns=target_col)
+            abs_err = abs(cv_results[model] - cv_results[target_col])
+            cv_results = ufp.assign_columns(cv_results, model, abs_err)
+        return ufp.drop_columns(cv_results, target_col)
 
-    @old_kw_to_pos(["data"], [1])
+    def _invert_transforms_fitted(self, df: DFType) -> DFType:
+        if self.ts.target_transforms is None:
+            return df
+        if any(
+            isinstance(tfm, _BaseGroupedArrayTargetTransform)
+            for tfm in self.ts.target_transforms
+        ):
+            model_cols = [
+                c for c in df.columns if c not in (self.ts.id_col, self.ts.time_col)
+            ]
+            id_counts = ufp.counts_by_id(df, self.ts.id_col)
+            sizes = id_counts["counts"].to_numpy()
+            indptr = np.append(0, sizes.cumsum())
+        for tfm in self.ts.target_transforms[::-1]:
+            if isinstance(tfm, _BaseGroupedArrayTargetTransform):
+                if self.ts._dropped_series is not None:
+                    idxs = np.delete(
+                        np.arange(self.ts.ga.n_groups), self.ts._dropped_series
+                    )
+                    tfm = tfm.take(idxs)
+                for col in model_cols:
+                    ga = GroupedArray(df[col].to_numpy(), indptr)
+                    ga = tfm.inverse_transform_fitted(ga)
+                    df = ufp.assign_columns(df, col, ga.data)
+            else:
+                df = tfm.inverse_transform(df)
+        return df
+
+    def _extract_X_y(
+        self,
+        prep: DFType,
+        target_col: str,
+        weight_col: Optional[str],
+    ) -> Tuple[Union[DFType, np.ndarray], np.ndarray]:
+        x_cols = self.ts.features_order_
+        if weight_col is not None:
+            x_cols = [weight_col, *x_cols]
+        X = prep[x_cols]
+        targets = [c for c in prep.columns if re.match(rf"^{target_col}\d*$", c)]
+        if len(targets) == 1:
+            targets = targets[0]
+        y = prep[targets].to_numpy()
+        return X, y
+
+    def _compute_fitted_values(
+        self,
+        base: DFType,
+        X: Union[DFType, np.ndarray],
+        y: np.ndarray,
+        id_col: str,
+        time_col: str,
+        target_col: str,
+        max_horizon: Optional[int],
+        weight_col: Optional[str],
+    ) -> DFType:
+        if weight_col is not None:
+            if isinstance(X, np.ndarray):
+                X = X[:, 1:]
+            else:
+                X = ufp.drop_columns(X, weight_col)
+        base = ufp.copy_if_pandas(base, deep=False)
+        sort_idxs = ufp.maybe_compute_sort_indices(base, id_col, time_col)
+        if sort_idxs is not None:
+            base = ufp.take_rows(base, sort_idxs)
+            X = ufp.take_rows(X, sort_idxs)
+            y = y[sort_idxs]
+        if max_horizon is None:
+            fitted_values = ufp.assign_columns(base, target_col, y)
+            for name, model in self.models_.items():
+                assert not isinstance(model, list)  # mypy
+                preds = model.predict(X)
+                fitted_values = ufp.assign_columns(fitted_values, name, preds)
+            fitted_values = self._invert_transforms_fitted(fitted_values)
+        else:
+            horizon_fitted_values = []
+            for horizon in range(max_horizon):
+                horizon_base = ufp.copy_if_pandas(base, deep=True)
+                horizon_base = ufp.assign_columns(
+                    horizon_base, target_col, y[:, horizon]
+                )
+                horizon_fitted_values.append(horizon_base)
+            for name, horizon_models in self.models_.items():
+                for horizon, model in enumerate(horizon_models):
+                    preds = model.predict(X)
+                    horizon_fitted_values[horizon] = ufp.assign_columns(
+                        horizon_fitted_values[horizon], name, preds
+                    )
+            for horizon, horizon_df in enumerate(horizon_fitted_values):
+                keep_mask = ~ufp.is_nan(horizon_df[target_col])
+                horizon_df = ufp.filter_with_mask(horizon_df, keep_mask)
+                horizon_df = ufp.copy_if_pandas(horizon_df, deep=True)
+                horizon_df = self._invert_transforms_fitted(horizon_df)
+                horizon_df = ufp.assign_columns(horizon_df, "h", horizon + 1)
+                horizon_fitted_values[horizon] = horizon_df
+            fitted_values = ufp.vertical_concat(
+                horizon_fitted_values, match_categories=False
+            )
+        if self.ts.target_transforms is not None:
+            for tfm in self.ts.target_transforms[::-1]:
+                if hasattr(tfm, "store_fitted"):
+                    tfm.store_fitted = False
+                if hasattr(tfm, "fitted_"):
+                    tfm.fitted_ = []
+        return fitted_values
+
     def fit(
         self,
-        df: pd.DataFrame,
+        df: DataFrame,
         id_col: str = "unique_id",
         time_col: str = "ds",
         target_col: str = "y",
@@ -337,14 +478,15 @@ class MLForecast:
         keep_last_n: Optional[int] = None,
         max_horizon: Optional[int] = None,
         prediction_intervals: Optional[PredictionIntervals] = None,
-        *,
-        data: Optional[pd.DataFrame] = None,  # noqa: ARG002
+        fitted: bool = False,
+        as_numpy: bool = False,
+        weight_col: Optional[str] = None,
     ) -> "MLForecast":
         """Apply the feature engineering and train the models.
 
         Parameters
         ----------
-        df : pandas DataFrame
+        df : pandas or polars DataFrame
             Series data in long format.
         id_col : str (default='unique_id')
             Column that identifies each serie.
@@ -359,19 +501,27 @@ class MLForecast:
             Drop rows with missing values produced by the transformations.
         keep_last_n : int, optional (default=None)
             Keep only these many records from each serie for the forecasting step. Can save time and memory if your features allow it.
-        max_horizon: int, optional (default=None)
+        max_horizon : int, optional (default=None)
             Train this many models, where each model will predict a specific horizon.
         prediction_intervals : PredictionIntervals, optional (default=None)
             Configuration to calibrate prediction intervals (Conformal Prediction).
-        data : pandas DataFrame
-            Series data in long format. This argument has been replaced by df and will be removed in a later release.
+        fitted : bool (default=False)
+            Save in-sample predictions.
+        as_numpy : bool (default = False)
+            Cast features to numpy array.
+        weight_col : str, optional (default=None)
+            Column that contains the sample weights.
 
         Returns
         -------
         self : MLForecast
             Forecast object with series values and trained models.
         """
-        self._cs_df: Optional[pd.DataFrame] = None
+        if fitted and self.ts.target_transforms is not None:
+            for tfm in self.ts.target_transforms:
+                if hasattr(tfm, "store_fitted"):
+                    tfm.store_fitted = True
+        self._cs_df: Optional[DataFrame] = None
         if prediction_intervals is not None:
             self.prediction_intervals = prediction_intervals
             self._cs_df = self._conformity_scores(
@@ -384,8 +534,9 @@ class MLForecast:
                 keep_last_n=keep_last_n,
                 n_windows=prediction_intervals.n_windows,
                 h=prediction_intervals.h,
+                as_numpy=as_numpy,
             )
-        X, y = self.preprocess(
+        prep = self.preprocess(
             df=df,
             id_col=id_col,
             time_col=time_col,
@@ -394,34 +545,121 @@ class MLForecast:
             dropna=dropna,
             keep_last_n=keep_last_n,
             max_horizon=max_horizon,
-            return_X_y=True,
+            return_X_y=not fitted,
+            as_numpy=as_numpy,
+            weight_col=weight_col,
         )
-        X = X[self.ts.features_order_]
-        return self.fit_models(X, y)
+        if isinstance(prep, tuple):
+            X, y = prep
+        else:
+            base = prep[[id_col, time_col]]
+            X, y = self._extract_X_y(prep, target_col, weight_col)
+            if as_numpy:
+                X = ufp.to_numpy(X)
+            del prep
+        self.fit_models(X, y)
+        if fitted:
+            fitted_values = self._compute_fitted_values(
+                base=base,
+                X=X,
+                y=y,
+                id_col=id_col,
+                time_col=time_col,
+                target_col=target_col,
+                max_horizon=max_horizon,
+                weight_col=self.ts.weight_col,
+            )
+            fitted_values = ufp.drop_index_if_pandas(fitted_values)
+            self.fcst_fitted_values_ = fitted_values
+        return self
 
-    @old_kw_to_pos(["horizon"], [1])
+    def forecast_fitted_values(
+        self, level: Optional[List[Union[int, float]]] = None
+    ) -> DataFrame:
+        """Access in-sample predictions.
+
+        Parameters
+        ----------
+        level : list of ints or floats, optional (default=None)
+            Confidence levels between 0 and 100 for prediction intervals.
+
+        Returns
+        -------
+        pandas or polars DataFrame
+            Dataframe with predictions for the training set
+        """
+        if not hasattr(self, "fcst_fitted_values_"):
+            raise Exception("Please run the `fit` method using `fitted=True`")
+        res = self.fcst_fitted_values_
+        if level is not None:
+            res = ufp.add_insample_levels(
+                res,
+                models=list(self.models_.keys()),
+                level=level,
+                id_col=self.ts.id_col,
+                target_col=self.ts.target_col,
+            )
+        return res
+
+    def make_future_dataframe(self, h: int) -> DataFrame:
+        """Create a dataframe with all ids and future times in the forecasting horizon.
+
+        Parameters
+        ----------
+        h : int
+            Number of periods to predict.
+
+        Returns
+        -------
+        pandas or polars DataFrame
+            DataFrame with expected ids and future times
+        """
+        if not hasattr(self.ts, "id_col"):
+            raise ValueError("You must call fit first")
+        return ufp.make_future_dataframe(
+            uids=self.ts.uids,
+            last_times=self.ts.last_dates,
+            freq=self.freq,
+            h=h,
+            id_col=self.ts.id_col,
+            time_col=self.ts.time_col,
+        )
+
+    def get_missing_future(self, h: int, X_df: DFType) -> DFType:
+        """Get the missing id and time combinations in `X_df`.
+
+        Parameters
+        ----------
+        h : int
+            Number of periods to predict.
+        X_df : pandas or polars DataFrame, optional (default=None)
+            Dataframe with the future exogenous features. Should have the id column and the time column.
+
+        Returns
+        -------
+        pandas or polars DataFrame
+            DataFrame with expected ids and future times missing in `X_df`
+        """
+        expected = self.make_future_dataframe(h=h)
+        ids = [self.ts.id_col, self.ts.time_col]
+        return ufp.anti_join(expected, X_df[ids], on=ids)
+
     def predict(
         self,
         h: int,
-        dynamic_dfs: Optional[List[pd.DataFrame]] = None,
         before_predict_callback: Optional[Callable] = None,
         after_predict_callback: Optional[Callable] = None,
-        new_df: Optional[pd.DataFrame] = None,
+        new_df: Optional[DFType] = None,
         level: Optional[List[Union[int, float]]] = None,
-        X_df: Optional[pd.DataFrame] = None,
+        X_df: Optional[DFType] = None,
         ids: Optional[List[str]] = None,
-        *,
-        horizon: Optional[int] = None,  # noqa: ARG002
-        new_data: Optional[pd.DataFrame] = None,  # noqa: ARG002
-    ) -> pd.DataFrame:
+    ) -> DFType:
         """Compute the predictions for the next `h` steps.
 
         Parameters
         ----------
         h : int
             Number of periods to predict.
-        dynamic_dfs : list of pandas DataFrame, optional (default=None)
-            Future values of the dynamic features, e.g. prices.
         before_predict_callback : callable, optional (default=None)
             Function to call on the features before computing the predictions.
                 This function will take the input dataframe that will be passed to the model for predicting and should return a dataframe with the same structure.
@@ -430,45 +668,46 @@ class MLForecast:
             Function to call on the predictions before updating the targets.
                 This function will take a pandas Series with the predictions and should return another one with the same structure.
                 The series identifier is on the index.
-        new_df : pandas DataFrame, optional (default=None)
+        new_df : pandas or polars DataFrame, optional (default=None)
             Series data of new observations for which forecasts are to be generated.
                 This dataframe should have the same structure as the one used to fit the model, including any features and time series data.
                 If `new_df` is not None, the method will generate forecasts for the new observations.
         level : list of ints or floats, optional (default=None)
             Confidence levels between 0 and 100 for prediction intervals.
-        X_df : pandas DataFrame, optional (default=None)
+        X_df : pandas or polars DataFrame, optional (default=None)
             Dataframe with the future exogenous features. Should have the id column and the time column.
         ids : list of str, optional (default=None)
             List with subset of ids seen during training for which the forecasts should be computed.
-        horizon : int
-            Number of periods to predict. This argument has been replaced by h and will be removed in a later release.
-        new_data : pandas DataFrame, optional (default=None)
-            Series data of new observations for which forecasts are to be generated.
-                This dataframe should have the same structure as the one used to fit the model, including any features and time series data.
-                If `new_data` is not None, the method will generate forecasts for the new observations.
 
         Returns
         -------
-        result : pandas DataFrame
+        result : pandas or polars DataFrame
             Predictions for each serie and timestep, with one column per model.
         """
         if not hasattr(self, "models_"):
             raise ValueError(
-                "No fitted models found. You have to call fit or preprocess + fit_models."
+                "No fitted models found. You have to call fit or preprocess + fit_models. "
+                "If you used cross_validation before please fit again."
             )
-        if new_data is not None:
-            warnings.warn(
-                "`new_data` has been deprecated, please use `new_df` instead.",
-                DeprecationWarning,
+        first_model_is_list = isinstance(next(iter(self.models_.values())), list)
+        max_horizon = self.ts.max_horizon
+        if first_model_is_list and max_horizon is None:
+            raise ValueError(
+                "Found one model per horizon but `max_horizon` is None. "
+                "If you ran preprocess after fit please run fit again."
             )
-            new_df = new_data
-        if dynamic_dfs is not None:
-            warnings.warn(
-                "`dynamic_dfs` has been deprecated, please use `X_df` instead",
-                DeprecationWarning,
+        elif not first_model_is_list and max_horizon is not None:
+            raise ValueError(
+                "Found a single model for all horizons "
+                f"but `max_horizon` is {max_horizon}. "
+                "If you ran preprocess after fit please run fit again."
             )
 
         if new_df is not None:
+            if level is not None:
+                raise ValueError(
+                    "Prediction intervals are not supported in transfer learning."
+                )
             new_ts = TimeSeries(
                 freq=self.ts.freq,
                 lags=self.ts.lags,
@@ -476,6 +715,7 @@ class MLForecast:
                 date_features=self.ts.date_features,
                 num_threads=self.ts.num_threads,
                 target_transforms=self.ts.target_transforms,
+                lag_transforms_namer=self.ts.lag_transforms_namer,
             )
             new_ts._fit(
                 new_df,
@@ -485,7 +725,12 @@ class MLForecast:
                 static_features=self.ts.static_features,
                 keep_last_n=self.ts.keep_last_n,
             )
+            core_tfms = new_ts._get_core_lag_tfms()
+            if core_tfms:
+                # populate the stats needed for the updates
+                new_ts._compute_transforms(core_tfms, updates_only=False)
             new_ts.max_horizon = self.ts.max_horizon
+            new_ts.as_numpy = self.ts.as_numpy
             ts = new_ts
         else:
             ts = self.ts
@@ -493,7 +738,6 @@ class MLForecast:
         forecasts = ts.predict(
             models=self.models_,
             horizon=h,
-            dynamic_dfs=dynamic_dfs,
             before_predict_callback=before_predict_callback,
             after_predict_callback=after_predict_callback,
             X_df=X_df,
@@ -529,22 +773,28 @@ class MLForecast:
                 conformal_method = _get_conformal_method(
                     self.prediction_intervals.method
                 )
+                if ids is not None:
+                    ids_mask = ufp.is_in(self._cs_df[self.ts.id_col], ids)
+                    cs_df = ufp.filter_with_mask(self._cs_df, ids_mask)
+                    n_series = len(ids)
+                else:
+                    cs_df = self._cs_df
+                    n_series = self.ts.ga.n_groups
                 forecasts = conformal_method(
                     forecasts,
-                    self._cs_df,
+                    cs_df,
                     model_names=list(model_names),
                     level=level_,
                     cs_h=self.prediction_intervals.h,
                     cs_n_windows=self.prediction_intervals.n_windows,
-                    n_series=self.ts.ga.ngroups,
+                    n_series=n_series,
                     horizon=h,
                 )
         return forecasts
 
-    @old_kw_to_pos(["data", "window_size"], [1, 3])
     def cross_validation(
         self,
-        df: pd.DataFrame,
+        df: DFType,
         n_windows: int,
         h: int,
         id_col: str = "unique_id",
@@ -562,17 +812,16 @@ class MLForecast:
         level: Optional[List[Union[int, float]]] = None,
         input_size: Optional[int] = None,
         fitted: bool = False,
-        *,
-        data: Optional[pd.DataFrame] = None,  # noqa: ARG002
-        window_size: Optional[int] = None,  # noqa: ARG002
-    ):
+        as_numpy: bool = False,
+        weight_col: Optional[str] = None,
+    ) -> DFType:
         """Perform time series cross validation.
         Creates `n_windows` splits where each window has `h` test periods,
         trains the models, computes the predictions and merges the actuals.
 
         Parameters
         ----------
-        df : pandas DataFrame
+        df : pandas or polars DataFrame
             Series data in long format.
         n_windows : int
             Number of windows to evaluate.
@@ -614,38 +863,29 @@ class MLForecast:
             Maximum training samples per serie in each window. If None, will use an expanding window.
         fitted : bool (default=False)
             Store the in-sample predictions.
-        data : pandas DataFrame
-            Series data in long format. This argument has been replaced by df and will be removed in a later release.
-        window_size : int
-            Forecast horizon. This argument has been replaced by h and will be removed in a later release.
+        as_numpy : bool (default = False)
+            Cast features to numpy array.
+        weight_col : str, optional (default=None)
+            Column that contains the sample weights.
 
         Returns
         -------
-        result : pandas DataFrame
+        result : pandas or polars DataFrame
             Predictions for each window with the series id, timestamp, last train date, target value and predictions from each model.
         """
-        if hasattr(self, "models_"):
-            warnings.warn(
-                "Excuting `cross_validation` after `fit` can produce unexpected errors"
-            )
         results = []
-        self.cv_models_ = []
-        if np.issubdtype(df[time_col].dtype.type, np.integer):
-            freq = 1
-        else:
-            freq = self.freq
-
-        splits = backtest_splits(
+        cv_models = []
+        cv_fitted_values = []
+        splits = ufp.backtest_splits(
             df,
             n_windows=n_windows,
             h=h,
             id_col=id_col,
             time_col=time_col,
-            freq=freq,
+            freq=self.freq,
             step_size=step_size,
             input_size=input_size,
         )
-        self.cv_fitted_values_ = []
         for i_window, (cutoffs, train, valid) in enumerate(splits):
             should_fit = i_window == 0 or (refit > 0 and i_window % refit == 0)
             if should_fit:
@@ -659,48 +899,79 @@ class MLForecast:
                     keep_last_n=keep_last_n,
                     max_horizon=max_horizon,
                     prediction_intervals=prediction_intervals,
+                    fitted=fitted,
+                    as_numpy=as_numpy,
+                    weight_col=weight_col,
                 )
-                self.cv_models_.append(self.models_)
-            if fitted:
-                insample_results = train[[id_col, time_col]].copy()
-                trainX, _ = self.preprocess(
+                cv_models.append(self.models_)
+                if fitted:
+                    cv_fitted_values.append(
+                        ufp.assign_columns(self.fcst_fitted_values_, "fold", i_window)
+                    )
+            if fitted and not should_fit:
+                if self.ts.target_transforms is not None:
+                    for tfm in self.ts.target_transforms:
+                        if hasattr(tfm, "store_fitted"):
+                            tfm.store_fitted = True
+                prep = self.preprocess(
                     train,
                     id_col=id_col,
                     time_col=time_col,
                     target_col=target_col,
                     static_features=static_features,
-                    dropna=False,
+                    dropna=dropna,
                     keep_last_n=keep_last_n,
                     max_horizon=max_horizon,
-                    return_X_y=True,
+                    return_X_y=False,
+                    weight_col=weight_col,
                 )
-                trainX = trainX[self.ts.features_order_]
-                for name, model in self.models_.items():
-                    insample_results[name] = model.predict(trainX)  # type: ignore[union-attr]
-                if self.ts.target_transforms is not None:
-                    for tfm in self.ts.target_transforms[::-1]:
-                        insample_results = tfm.inverse_transform(insample_results)
-                insample_results["fold"] = i_window
-                insample_results[target_col] = train[target_col].values
-                self.cv_fitted_values_.append(insample_results)
-            static = self.ts.static_features_.columns.drop(id_col).tolist()
-            dynamic = valid.columns.drop(static + [id_col, time_col, target_col])
-            if not dynamic.empty:
-                X_df = valid.drop(columns=static + [target_col])
+                assert not isinstance(prep, tuple)
+                base = prep[[id_col, time_col]]
+                train_X, train_y = self._extract_X_y(prep, target_col, weight_col)
+                if as_numpy:
+                    train_X = ufp.to_numpy(train_X)
+                del prep
+                fitted_values = self._compute_fitted_values(
+                    base=base,
+                    X=train_X,
+                    y=train_y,
+                    id_col=id_col,
+                    time_col=time_col,
+                    target_col=target_col,
+                    max_horizon=max_horizon,
+                    weight_col=weight_col,
+                )
+                fitted_values = ufp.assign_columns(fitted_values, "fold", i_window)
+                cv_fitted_values.append(fitted_values)
+            static = [c for c in self.ts.static_features_.columns if c != id_col]
+            dynamic = [
+                c
+                for c in valid.columns
+                if c not in static + [id_col, time_col, target_col]
+            ]
+            if dynamic:
+                X_df: Optional[DataFrame] = ufp.drop_columns(
+                    valid, static + [target_col]
+                )
             else:
                 X_df = None
             y_pred = self.predict(
-                h,
+                h=h,
                 before_predict_callback=before_predict_callback,
                 after_predict_callback=after_predict_callback,
                 new_df=train if not should_fit else None,
                 level=level,
                 X_df=X_df,
             )
-            y_pred = y_pred.merge(cutoffs, on=id_col, how="left")
-            result = valid[[id_col, time_col, target_col]].merge(
-                y_pred, on=[id_col, time_col]
+            y_pred = ufp.join(y_pred, cutoffs, on=id_col, how="left")
+            result = ufp.join(
+                valid[[id_col, time_col, target_col]],
+                y_pred,
+                on=[id_col, time_col],
             )
+            sort_idxs = ufp.maybe_compute_sort_indices(result, id_col, time_col)
+            if sort_idxs is not None:
+                result = ufp.take_rows(result, sort_idxs)
             if result.shape[0] < valid.shape[0]:
                 raise ValueError(
                     "Cross validation result produced less results than expected. "
@@ -708,13 +979,69 @@ class MLForecast:
                     "and that there aren't any missing periods."
                 )
             results.append(result)
-        out = pd.concat(results)
-        cols_order = [id_col, time_col, "cutoff", target_col]
-        return out[cols_order + out.columns.drop(cols_order).tolist()]
+        del self.models_
+        self.cv_models_ = cv_models
+        self.cv_fitted_values_ = cv_fitted_values
+        out = ufp.vertical_concat(results, match_categories=False)
+        out = ufp.drop_index_if_pandas(out)
+        first_out_cols = [id_col, time_col, "cutoff", target_col]
+        remaining_cols = [c for c in out.columns if c not in first_out_cols]
+        return out[first_out_cols + remaining_cols]
 
     def cross_validation_fitted_values(self):
         if not getattr(self, "cv_fitted_values_", []):
             raise ValueError("Please run cross_validation with fitted=True first.")
-        cols_order = [self.ts.id_col, self.ts.time_col, "fold", self.ts.target_col]
-        out = pd.concat(self.cv_fitted_values_).reset_index(drop=True)
-        return out[cols_order + out.columns.drop(cols_order).tolist()]
+        out = ufp.vertical_concat(self.cv_fitted_values_, match_categories=False)
+        first_out_cols = [self.ts.id_col, self.ts.time_col, "fold", self.ts.target_col]
+        remaining_cols = [c for c in out.columns if c not in first_out_cols]
+        out = ufp.drop_index_if_pandas(out)
+        return out[first_out_cols + remaining_cols]
+
+    def save(self, path: Union[str, Path]) -> None:
+        """Save forecast object
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            Directory where artifacts will be stored."""
+        self.ts.save(f"{path}/ts.pkl")
+        with fsspec.open(f"{path}/models.pkl", "wb") as f:
+            cloudpickle.dump(self.models_, f)
+        if self._cs_df is not None:
+            with fsspec.open(f"{path}/intervals.pkl", "wb") as f:
+                cloudpickle.dump(
+                    {"scores": self._cs_df, "settings": self.prediction_intervals}, f
+                )
+
+    @staticmethod
+    def load(path: Union[str, Path]) -> "MLForecast":
+        """Load forecast object
+
+        Parameters
+        ----------
+        path : str or pathlib.Path
+            Directory with saved artifacts."""
+        ts = TimeSeries.load(f"{path}/ts.pkl")
+        with fsspec.open(f"{path}/models.pkl", "rb") as f:
+            models = cloudpickle.load(f)
+        try:
+            with fsspec.open(f"{path}/intervals.pkl", "rb") as f:
+                intervals = cloudpickle.load(f)
+        except FileNotFoundError:
+            intervals = None
+        fcst = MLForecast(models=models, freq=ts.freq)
+        fcst.ts = ts
+        fcst.models_ = models
+        if intervals is not None:
+            fcst.prediction_intervals = intervals["settings"]
+            fcst._cs_df = intervals["scores"]
+        return fcst
+
+    def update(self, df: DataFrame) -> None:
+        """Update the values of the stored series.
+
+        Parameters
+        ----------
+        df : pandas or polars DataFrame
+            Dataframe with new observations."""
+        self.ts.update(df)

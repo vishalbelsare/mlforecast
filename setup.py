@@ -22,16 +22,32 @@ licenses = {
 }
 statuses = [ '1 - Planning', '2 - Pre-Alpha', '3 - Alpha',
     '4 - Beta', '5 - Production/Stable', '6 - Mature', '7 - Inactive' ]
-py_versions = '2.0 2.1 2.2 2.3 2.4 2.5 2.6 2.7 3.0 3.1 3.2 3.3 3.4 3.5 3.6 3.7 3.8 3.9 3.10'.split()
+py_versions = '3.9 3.10 3.11 3.12 3.13'.split()
 
-requirements = cfg.get('requirements','').split()
-distributed_requirements = cfg.get('distributed_requirements', '').split()
-dev_requirements = requirements + distributed_requirements + cfg.get('dev_requirements', '').split()
+requirements = cfg['requirements'].split()
+dask_requirements = cfg['dask_requirements'].split()
+ray_requirements = cfg['ray_requirements'].split()
+spark_requirements = cfg['spark_requirements'].split()
+aws_requirements = cfg['aws_requirements'].split()
+azure_requirements = cfg['azure_requirements'].split()
+gcp_requirements = cfg['gcp_requirements'].split()
+polars_requirements = cfg['polars_requirements'].split()
+dev_requirements = cfg['dev_requirements'].split()
+all_requirements = {
+    *dask_requirements,
+    *ray_requirements,
+    *spark_requirements,
+    *aws_requirements,
+    *azure_requirements,
+    *gcp_requirements,
+    *polars_requirements,
+    *dev_requirements,
+}
 min_python = cfg['min_python']
 lic = licenses.get(cfg['license'].lower(), (cfg['license'], None))
 
 setuptools.setup(
-    name = 'mlforecast', 
+    name = 'mlforecast',
     license = lic[0],
     classifiers = [
         'Development Status :: ' + statuses[int(cfg['status'])],
@@ -43,14 +59,23 @@ setuptools.setup(
     include_package_data = True,
     install_requires = requirements,
     extras_require = {
-        'distributed': distributed_requirements,
+        'dask': dask_requirements,
+        'ray': ray_requirements,
+        'spark': spark_requirements,
+        'aws': aws_requirements,
+        'azure': azure_requirements,
+        'gcp': gcp_requirements,
+        'polars': polars_requirements,
         'dev': dev_requirements,
+        'all': all_requirements,
     },
     dependency_links = cfg.get('dep_links','').split(),
     python_requires  = '>=' + cfg['min_python'],
     long_description = open('README.md', encoding='utf-8').read(),
     long_description_content_type = 'text/markdown',
     zip_safe = False,
-    entry_points = { 'console_scripts': cfg.get('console_scripts','').split() },
+    entry_points = {
+        'console_scripts': cfg.get('console_scripts','').split(),
+        'nbdev': [f'{cfg.get("lib_path")}={cfg.get("lib_path")}._modidx:d']
+    },
     **setup_cfg)
-
